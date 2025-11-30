@@ -1,10 +1,23 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // 仅在Android平台启用WebView调试（iOS不支持此方法）
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    await InAppWebViewController.setWebContentsDebuggingEnabled(true);
+  }
+  
+  // 捕获全局错误
+  FlutterError.onError = (FlutterErrorDetails details) {
+    debugPrint('Flutter错误: ${details.exception}');
+    debugPrint('堆栈: ${details.stack}');
+  };
+  
   runApp(const ArcaeaHelperApp());
 }
 
@@ -173,6 +186,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
                 );
               },
               onLoadStart: (controller, url) {
+                debugPrint('[WebView] 开始加载: $url');
                 setState(() {
                   currentUrl = url?.toString() ?? '';
                 });
@@ -183,6 +197,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
                 });
               },
               onLoadStop: (controller, url) async {
+                debugPrint('[WebView] 加载完成: $url');
                 setState(() {
                   progress = 1.0;
                 });
@@ -190,12 +205,23 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
                 // 检查是否是目标页面
                 if (url.toString().contains('arcaea.lowiro.com') &&
                     url.toString().contains('/profile/potential')) {
+                  debugPrint('[WebView] 检测到目标页面，开始注入脚本');
                   await _injectArcaeaHelper(controller);
                 }
               },
               onConsoleMessage: (controller, consoleMessage) {
                 debugPrint(
                     '[WebView Console] ${consoleMessage.messageLevel}: ${consoleMessage.message}');
+              },
+              onReceivedError: (controller, request, error) {
+                debugPrint('[WebView Error] URL: ${request.url}, Error: ${error.description}, Type: ${error.type}');
+              },
+              onReceivedHttpError: (controller, request, response) {
+                debugPrint('[WebView HTTP Error] URL: ${request.url}, Status: ${response.statusCode}');
+              },
+              shouldOverrideUrlLoading: (controller, navigationAction) async {
+                debugPrint('[WebView] 导航请求: ${navigationAction.request.url}');
+                return NavigationActionPolicy.ALLOW;
               },
             ),
           ),
