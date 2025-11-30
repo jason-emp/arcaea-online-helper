@@ -1,6 +1,7 @@
 # 🎵 Arcaea Online Helper
 
 一个功能强大的 Chrome 扩展，用于增强 Arcaea Online 查分页面体验，提供谱面定数显示、PTT 计算、推分辅助等多项实用功能。
+**目前定数表适用于 移动版 v6.11.0。**
 
 ---
 
@@ -154,13 +155,30 @@
 </details>
 
 <details>
-<summary><strong>Q4: 如何更新数据？</strong></summary>
+<summary><strong>Q4: 如何更新定数和曲目列表数据？</strong></summary>
 
-当 Arcaea 有新曲目或定数变化时：
-1. 下载最新的 ChartConstant.json 和 Songlist.json
-2. 替换扩展文件夹中的文件
-3. 在 chrome://extensions/ 刷新扩展
-4. 刷新网页
+当 Arcaea 有新曲目或定数变化时，需要手动更新 JSON 数据文件：
+
+**更新步骤：**
+
+1. **获取最新数据** - 访问 Arcaea 中文维基获取最新 JSON 数据：
+   - [ChartConstant.json](https://arcwiki.mcd.blue/index.php?title=Template:ChartConstant.json&action=edit) - 谱面定数数据
+   - [Songlist.json](https://arcwiki.mcd.blue/index.php?title=Template:Songlist.json&action=edit) - 曲目列表数据
+
+2. **复制代码** - 在上述页面中复制完整的 JSON 代码
+
+3. **替换本地文件** - 用复制的内容分别替换扩展文件夹中的：
+   - `ChartConstant.json`
+   - `Songlist.json`
+
+4. **重载扩展** - 在 `chrome://extensions/` 页面点击扩展的刷新按钮
+
+5. **刷新网页** - 重新加载 Arcaea Online 页面即可生效
+
+**注意：**
+- 本仓库会尽量同步更新数据文件，但不保证始终为最新版本
+- 建议在 Arcaea 更新后手动检查并更新数据文件
+- 数据来源于 Arcaea 中文维基社区，感谢数据维护者的贡献
 </details>
 
 <details>
