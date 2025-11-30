@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,11 +65,33 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   bool showPTT = true;
   bool showTargetScore = true;
   bool showDownloadButtons = true;
+  bool _isTargetPage = false;
+
+  Timer? _aggressiveTimer;
+  bool _aggressiveLoopActive = false;
+  bool _isPerformingAggressiveCycle = false;
+  int _aggressiveAttempts = 0;
+  static const int _maxAggressiveAttempts = 50;
+  static const Duration _aggressiveInterval = Duration(milliseconds: 400);
+
+  String? _cachedCalculatorScript;
+  String? _cachedDataLoaderScript;
+  String? _cachedContentScript;
+  String? _cachedStyles;
+  String? _cachedChartConstant;
+  String? _cachedSonglist;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _preloadInjectionAssets();
+  }
+
+  @override
+  void dispose() {
+    _stopAggressiveLoop();
+    super.dispose();
   }
 
   Future<void> _loadSettings() async {
@@ -83,6 +108,10 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     } catch (e) {
       debugPrint('[Arcaea Helper] 加载设置失败: $e');
     }
+  }
+
+  void _preloadInjectionAssets() {
+    unawaited(_ensureAssetsCached());
   }
 
   Future<void> _saveSettings() async {
@@ -123,6 +152,20 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
 
   Future<String> _loadAssetAsString(String path) async {
     return await rootBundle.loadString(path);
+  }
+
+  Future<void> _ensureAssetsCached() async {
+    _cachedCalculatorScript ??=
+        await _loadAssetAsString('web/js/arcaea-calculator.js');
+    _cachedDataLoaderScript ??=
+        await _loadAssetAsString('web/js/arcaea-data-loader.js');
+    _cachedContentScript ??=
+        await _loadAssetAsString('web/js/flutter-content.js');
+    _cachedStyles ??= await _loadAssetAsString('web/css/arcaea-styles.css');
+    _cachedChartConstant ??=
+        await _loadAssetAsString('assets/data/ChartConstant.json');
+    _cachedSonglist ??=
+        await _loadAssetAsString('assets/data/Songlist.json');
   }
 
   @override
@@ -186,16 +229,15 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
                     return await _loadAssetAsString(assetPath);
                   },
                 );
-                
-                // iOS平台启动持续检查机制
-                if (defaultTargetPlatform == TargetPlatform.iOS) {
-                  _startContinuousCheck(controller);
-                }
               },
               onLoadStart: (controller, url) {
                 debugPrint('[WebView] 开始加载: $url');
+                _resetInjectionState();
+                final rawUrl = url?.toString();
+                _isTargetPage = _isTargetUrl(rawUrl);
                 setState(() {
-                  currentUrl = url?.toString() ?? '';
+                  currentUrl = rawUrl ?? '';
+                  progress = 0;
                 });
               },
               onProgressChanged: (controller, progress) {
@@ -209,19 +251,25 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
                   progress = 1.0;
                 });
 
-                // 检查是否是目标页面
-                if (url.toString().contains('arcaea.lowiro.com') &&
-                    url.toString().contains('/profile/potential')) {
-                  debugPrint('[WebView] 检测到目标页面，开始注入脚本');
-                  _hasInjectedScript = false;
-                  _hasTriggeredProcessing = false;
-                  await _injectArcaeaHelper(controller);
-                  
-                  // Android平台在这里已经可以工作，但iOS需要额外处理
-                  if (defaultTargetPlatform == TargetPlatform.android) {
-                    // Android可以立即触发
-                    await Future.delayed(const Duration(milliseconds: 500));
-                    await _ensureScriptTriggered(controller);
+                final isTarget = _isTargetUrl(url?.toString());
+                _isTargetPage = isTarget;
+                if (isTarget) {
+                  _startAggressiveInjectionLoop(controller, reason: 'loadStop', forceRestart: true);
+                } else {
+                  _stopAggressiveLoop();
+                }
+              },
+              onLoadResource: (controller, resource) {
+                final resourceUrl = resource.url?.toString() ?? '';
+                if (_isTargetUrl(resourceUrl)) {
+                  if (!_isTargetPage) {
+                    debugPrint('[WebView] 资源阶段检测到目标页面: $resourceUrl');
+                  }
+                  _isTargetPage = true;
+                  if (_aggressiveLoopActive) {
+                    _aggressiveAttempts = 0;
+                  } else {
+                    _startAggressiveInjectionLoop(controller, reason: 'resource');
                   }
                 }
               },
@@ -231,9 +279,14 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
               },
               onReceivedError: (controller, request, error) {
                 debugPrint('[WebView Error] URL: ${request.url}, Error: ${error.description}, Type: ${error.type}');
+                _stopAggressiveLoop();
               },
               onReceivedHttpError: (controller, request, response) {
                 debugPrint('[WebView HTTP Error] URL: ${request.url}, Status: ${response.statusCode}');
+                final statusCode = response.statusCode;
+                if (statusCode != null && statusCode >= 400) {
+                  _stopAggressiveLoop();
+                }
               },
               shouldOverrideUrlLoading: (controller, navigationAction) async {
                 debugPrint('[WebView] 导航请求: ${navigationAction.request.url}');
@@ -253,7 +306,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -326,6 +379,20 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
               _saveSettings();
             },
           ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: _launchLatestRelease,
+            icon: const Icon(Icons.download),
+            label: const Text('下载最新版本'),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '跳转至GitHub发布页下载最新版本',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
         ],
       ),
     );
@@ -372,23 +439,148 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     );
   }
 
+  Future<void> _launchLatestRelease() async {
+    const releaseUrl = 'https://github.com/jason-emp/arcaea-online-helper/releases/latest';
+    final uri = Uri.parse(releaseUrl);
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('无法打开浏览器，请稍后再试')),
+      );
+    }
+  }
+
+  void _resetInjectionState() {
+    _hasInjectedScript = false;
+    _hasTriggeredProcessing = false;
+    _isTargetPage = false;
+    _aggressiveAttempts = 0;
+    _isPerformingAggressiveCycle = false;
+    _stopAggressiveLoop();
+  }
+
+  bool _isTargetUrl(String? rawUrl) {
+    if (rawUrl == null || rawUrl.isEmpty) {
+      return false;
+    }
+
+    try {
+      final uri = Uri.parse(rawUrl);
+      return uri.host.contains('arcaea.lowiro.com') &&
+          uri.path.contains('/profile/potential');
+    } catch (_) {
+      return rawUrl.contains('arcaea.lowiro.com') &&
+          rawUrl.contains('/profile/potential');
+    }
+  }
+
+  void _startAggressiveInjectionLoop(
+    InAppWebViewController controller, {
+    String reason = 'manual',
+    bool forceRestart = false,
+  }) {
+    if (!_isTargetPage) {
+      return;
+    }
+
+    if (_aggressiveLoopActive && !forceRestart) {
+      return;
+    }
+
+    if (forceRestart) {
+      _stopAggressiveLoop();
+    }
+
+    if (_aggressiveLoopActive) {
+      return;
+    }
+
+    debugPrint('[Arcaea Helper] 启动激进注入循环 ($reason)');
+    _aggressiveAttempts = 0;
+    _aggressiveLoopActive = true;
+    unawaited(
+        _performAggressiveInjectionStep(controller, reason: 'initial-$reason'));
+    _aggressiveTimer?.cancel();
+    _aggressiveTimer = Timer.periodic(_aggressiveInterval, (_) {
+      unawaited(
+          _performAggressiveInjectionStep(controller, reason: 'timer-$reason'));
+    });
+
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      _startContinuousCheck(controller);
+    }
+  }
+
+  Future<void> _performAggressiveInjectionStep(
+    InAppWebViewController controller, {
+    String reason = '',
+  }) async {
+    if (!mounted) {
+      _stopAggressiveLoop();
+      return;
+    }
+
+    if (_isPerformingAggressiveCycle) {
+      return;
+    }
+
+    if (!_isTargetPage) {
+      _stopAggressiveLoop();
+      return;
+    }
+
+    if (_hasInjectedScript && _hasTriggeredProcessing) {
+      _stopAggressiveLoop();
+      return;
+    }
+
+    _isPerformingAggressiveCycle = true;
+    _aggressiveAttempts++;
+
+    try {
+      if (!_hasInjectedScript) {
+        await _injectArcaeaHelper(controller);
+      } else {
+        await _ensureScriptTriggered(controller);
+      }
+    } catch (e, stackTrace) {
+      debugPrint('[Arcaea Helper] 激进注入循环错误($reason): $e');
+      debugPrint('[Arcaea Helper] 堆栈: $stackTrace');
+    } finally {
+      _isPerformingAggressiveCycle = false;
+    }
+
+    if (_hasInjectedScript && _hasTriggeredProcessing) {
+      debugPrint('[Arcaea Helper] 激进注入循环完成');
+      _stopAggressiveLoop();
+      return;
+    }
+
+    if (_aggressiveAttempts >= _maxAggressiveAttempts) {
+      debugPrint('[Arcaea Helper] 激进注入循环达到上限 ($reason)');
+      _stopAggressiveLoop();
+    }
+  }
+
+  void _stopAggressiveLoop() {
+    _aggressiveTimer?.cancel();
+    _aggressiveTimer = null;
+    _aggressiveLoopActive = false;
+    _isPerformingAggressiveCycle = false;
+  }
+
   Future<void> _injectArcaeaHelper(InAppWebViewController controller) async {
     try {
       debugPrint('[Arcaea Helper] 开始注入脚本...');
-      
+
       // 加载核心模块
-      final calculator =
-          await _loadAssetAsString('web/js/arcaea-calculator.js');
-      final dataLoader =
-          await _loadAssetAsString('web/js/arcaea-data-loader.js');
-      final contentScript =
-          await _loadAssetAsString('web/js/flutter-content.js');
-      final styles =
-          await _loadAssetAsString('web/css/arcaea-styles.css');
-      final chartConstant =
-          await _loadAssetAsString('assets/data/ChartConstant.json');
-      final songlist =
-          await _loadAssetAsString('assets/data/Songlist.json');
+      await _ensureAssetsCached();
+      final calculator = _cachedCalculatorScript!;
+      final dataLoader = _cachedDataLoaderScript!;
+      final contentScript = _cachedContentScript!;
+      final styles = _cachedStyles!;
+      final chartConstant = _cachedChartConstant!;
+      final songlist = _cachedSonglist!;
 
       debugPrint('[Arcaea Helper] 资源加载完成');
 
@@ -447,6 +639,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
       debugPrint('[Arcaea Helper] 内容脚本已注入');
 
       // 7. 等待脚本初始化完成并主动触发页面处理
+      bool triggeredViaReadyState = false;
       for (int i = 0; i < 20; i++) {
         await Future.delayed(const Duration(milliseconds: 100));
         
@@ -467,23 +660,33 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
             })();
           ''');
           
+          _hasTriggeredProcessing = true;
+          triggeredViaReadyState = true;
           debugPrint('[Arcaea Helper] ✅ 脚本注入完成并已触发');
-          return;
+          break;
         }
       }
       
       // 如果等待超时，仍然尝试触发
-      debugPrint('[Arcaea Helper] ⚠️ 脚本就绪检测超时，强制触发');
-      await controller.evaluateJavascript(source: '''
-        (function() {
-          if (typeof window.triggerProcessAllCards === 'function') {
-            console.log('[Arcaea Helper Flutter] 强制触发页面处理');
-            window.triggerProcessAllCards();
-          } else {
-            console.error('[Arcaea Helper Flutter] triggerProcessAllCards 函数不存在');
-          }
-        })();
-      ''');
+      if (!triggeredViaReadyState) {
+        debugPrint('[Arcaea Helper] ⚠️ 脚本就绪检测超时，强制触发');
+        final forced = await controller.evaluateJavascript(source: '''
+          (function() {
+            if (typeof window.triggerProcessAllCards === 'function') {
+              console.log('[Arcaea Helper Flutter] 强制触发页面处理');
+              window.triggerProcessAllCards();
+              return true;
+            } else {
+              console.error('[Arcaea Helper Flutter] triggerProcessAllCards 函数不存在');
+              return false;
+            }
+          })();
+        ''');
+
+        if (forced == true) {
+          _hasTriggeredProcessing = true;
+        }
+      }
 
       debugPrint('[Arcaea Helper] ✅ 脚本注入完成');
       _hasInjectedScript = true;
