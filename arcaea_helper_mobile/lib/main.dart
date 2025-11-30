@@ -53,6 +53,8 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   double progress = 0;
   String currentUrl = '';
   bool showSettings = false;
+  bool _hasInjectedScript = false;
+  bool _hasTriggeredProcessing = false;
 
   // 设置状态
   bool showCharts = false;
@@ -184,6 +186,11 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
                     return await _loadAssetAsString(assetPath);
                   },
                 );
+                
+                // iOS平台启动持续检查机制
+                if (defaultTargetPlatform == TargetPlatform.iOS) {
+                  _startContinuousCheck(controller);
+                }
               },
               onLoadStart: (controller, url) {
                 debugPrint('[WebView] 开始加载: $url');
@@ -206,7 +213,16 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
                 if (url.toString().contains('arcaea.lowiro.com') &&
                     url.toString().contains('/profile/potential')) {
                   debugPrint('[WebView] 检测到目标页面，开始注入脚本');
+                  _hasInjectedScript = false;
+                  _hasTriggeredProcessing = false;
                   await _injectArcaeaHelper(controller);
+                  
+                  // Android平台在这里已经可以工作，但iOS需要额外处理
+                  if (defaultTargetPlatform == TargetPlatform.android) {
+                    // Android可以立即触发
+                    await Future.delayed(const Duration(milliseconds: 500));
+                    await _ensureScriptTriggered(controller);
+                  }
                 }
               },
               onConsoleMessage: (controller, consoleMessage) {
@@ -470,9 +486,86 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
       ''');
 
       debugPrint('[Arcaea Helper] ✅ 脚本注入完成');
+      _hasInjectedScript = true;
     } catch (e, stackTrace) {
       debugPrint('[Arcaea Helper] ❌ 脚本注入失败: $e');
       debugPrint('[Arcaea Helper] 堆栈: $stackTrace');
+    }
+  }
+
+  Future<void> _ensureScriptTriggered(InAppWebViewController controller) async {
+    if (_hasTriggeredProcessing) {
+      debugPrint('[Arcaea Helper] 已经触发过处理，跳过');
+      return;
+    }
+    
+    try {
+      // 检查DOM是否有内容
+      final hasContent = await controller.evaluateJavascript(source: '''
+        (function() {
+          const cardLists = document.querySelectorAll('.card-list, [class*="card-list"]');
+          const hasCards = Array.from(cardLists).some(list => 
+            list.querySelectorAll('[data-v-b3942f14].card').length > 0
+          );
+          return hasCards;
+        })();
+      ''');
+      
+      if (hasContent != true) {
+        debugPrint('[Arcaea Helper] DOM内容尚未准备好');
+        return;
+      }
+      
+      final isReady = await controller.evaluateJavascript(source: '''
+        (function() {
+          return window.arcaeaHelperReady === true && 
+                 typeof window.triggerProcessAllCards === 'function';
+        })();
+      ''');
+      
+      if (isReady == true) {
+        debugPrint('[Arcaea Helper] ✅ 触发页面处理');
+        await controller.evaluateJavascript(source: '''
+          (function() {
+            console.log('[Arcaea Helper Flutter] 触发页面处理');
+            window.triggerProcessAllCards();
+          })();
+        ''');
+        _hasTriggeredProcessing = true;
+      } else {
+        debugPrint('[Arcaea Helper] 脚本尚未就绪');
+      }
+    } catch (e) {
+      debugPrint('[Arcaea Helper] 确保触发失败: $e');
+    }
+  }
+  
+  void _startContinuousCheck(InAppWebViewController controller) {
+    // 为iOS启动持续检查机制
+    debugPrint('[Arcaea Helper] iOS: 启动持续检查机制');
+    
+    void checkAndTrigger() async {
+      if (!_hasInjectedScript) {
+        debugPrint('[Arcaea Helper] iOS: 脚本尚未注入，等待...');
+        return;
+      }
+      
+      if (_hasTriggeredProcessing) {
+        debugPrint('[Arcaea Helper] iOS: 已触发处理，停止检查');
+        return;
+      }
+      
+      await _ensureScriptTriggered(controller);
+    }
+    
+    // 延迟检查：500ms, 1s, 1.5s, 2s, 2.5s, 3s, 4s, 5s
+    final delays = [500, 1000, 1500, 2000, 2500, 3000, 4000, 5000];
+    for (final delay in delays) {
+      Future.delayed(Duration(milliseconds: delay), () {
+        if (mounted && !_hasTriggeredProcessing) {
+          checkAndTrigger();
+        }
+      });
     }
   }
 }
