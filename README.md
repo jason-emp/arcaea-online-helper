@@ -1,290 +1,226 @@
-# 🎵 Arcaea Online Helper
+# Arcaea Online Helper
 
-一个功能强大的 Chrome 扩展，用于增强 Arcaea Online 查分页面体验，提供谱面定数显示、PTT 计算、推分辅助等多项实用功能。
-**目前定数表适用于 移动版 v6.11.0。**
+一个增强 Arcaea Online 查分页面的跨平台工具，支持 Android、 iOS 和 Chrome 扩展（Windows、 macOS、 Linux）。
 
----
+## 功能特性
 
-## ✨ 功能特点
-
-### 📊 核心功能
-- 🎯 **谱面定数显示** - 在曲目名称旁显示定数，如 `Tempestissimo (11.3)`
-- 💎 **单曲 PTT 计算** - 实时计算并显示每首歌的 Potential
-- 🎓 **精确总 PTT** - 基于 Best 30 和 Recent 10 计算准确的总 PTT 值
-- 🎯 **推分目标提示** - 显示使显示 PTT +0.01 所需的目标分数
-- 📈 **定数需求卡片** - 展示达到 +0.01 PTT 所需的最低谱面定数（EX+、EX、995W 等）
-- 🔢 **曲目编号** - 自动为 Best 30 (#1-#30) 和 Recent 10 (R1-R10) 添加序号
-- 📍 **分隔线** - 在 Best 30 和 Recent 10 之间添加视觉分隔
-- 🖥️ **优化PC端排版和UI** - 针对桌面浏览器优化布局，提升查分页面的可读性和美观度
-
-### 🎮 兼容性
-- ✅ **支持所有难度** - Past / Present / Future / Beyond / Eternal
-- 🔄 **动态更新** - 自动处理页面路由变化和动态加载
-- 🌍 **多语言支持** - 支持英文和日文曲目名称
-- 🎨 **自定义设置** - 可选择显示/隐藏图表、下载按钮等
-
-### ⚡ 技术特性
-- 🚀 **性能优化** - 不影响网站性能
-- 🔒 **隐私安全** - 完全本地运行，不收集任何数据
-- 🛡️ **稳定可靠** - 支持页面刷新和 SPA 路由切换
-
----
+- 📊 **显示谱面定数**：在曲目名称旁显示谱面定数
+- 🎯 **计算单曲PTT**：显示每首歌曲的 PTT 值
+- 📈 **计算总PTT**：基于 Best 30 和 Recent 10 计算精确总 PTT
+- 🎯 **目标分数**：显示使显示 PTT +0.01 所需的目标分数
+- 💎 **定数表格**：展示不同分数等级所需的最低谱面定数
+- 🎨 **双列/三列布局**：PC 端优化显示
+- ⚙️ **可自定义设置**：控制各项功能的显示
 
 ## 🚀 快速开始
 
-### 前置要求
+### 自动同步工具
 
-⚠️ **重要：需要用户订阅了 Arcaea Online**
+本项目使用 Node.js 自动同步工具，文件保存在各自目录中，但会自动从 `shared_core` 同步更新。
 
-本扩展仅适用于已订阅 Arcaea Online 服务的用户。如果您还未订阅，请访问 [Arcaea 官网](https://arcaea.lowiro.com/) 进行订阅。
-
-### 安装（30秒）
-
-1. 打开 Chrome，访问 `chrome://extensions/`
-2. 开启「开发者模式」
-3. 点击「加载已解压的扩展程序」
-4. 选择本项目文件夹
-5. 完成！
-
-### 使用
-
-1. 访问 https://arcaea.lowiro.com/
-2. 登录账号
-3. 进入 Profile 页面（Potential 页面）
-4. 扩展会自动显示：
-   - 谱面定数（灰色）
-   - 单曲 PTT（紫色粗体）
-   - 推分目标分数（绿色）
-   - 总 PTT（用户名旁）
-   - 定数需求卡片（B1 前方）
-
-### ⚙️ 设置
-
-点击扩展图标打开设置面板，可以自定义：
-
-- **显示图表** - 是否显示 Best 30/Recent 10 的 PTT 变化图表（默认隐藏）
-- **显示定数** - 是否显示谱面定数（默认显示）
-- **显示单曲 PTT** - 是否显示单曲 PTT 值（默认显示）
-- **显示目标分数** - 是否显示推分目标（默认显示）
-- **显示下载按钮** - 是否显示截图下载和背景选择按钮（默认显示）
-
-💡 **提示：** 更改设置后需刷新页面生效。
-
-
-## 📸 效果预览
-
-**Best 30 示例：**
-```
-╔═══════════════════════════════════════════════════╗
-║  #1  Tempestissimo (11.3) 12.9876         ▸      ║
-║      Score: 9,950,000  >> 9,965,432              ║
-║                                                   ║
-║  #2  Grievous Lady (11.1) 12.7543          ▸     ║
-║      Score: 9,920,000  >> 9,948,765              ║
-║                                                   ║
-║  ... (更多曲目)                                   ║
-║                                                   ║
-║  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ║
-║                                                   ║
-║  R1  Fracture Ray (11.1) 12.5432           ▸     ║
-║      Score: 9,880,000  >> 9,912,345              ║
-╚═══════════════════════════════════════════════════╝
-```
-
-**显示内容说明：**
-- 曲目序号（#1-#30 为 Best 30，R1-R10 为 Recent 10）
-- 曲目名称 + 谱面定数（灰色）
-- 单曲 PTT 值（紫色粗体）
-- 当前分数
-- 目标分数（绿色，推分 +0.01 PTT 所需）
-- 用户名旁显示计算的总 PTT
-
-**定数需求卡片：**
-```
-╔═══════════════════════════════════════════════════╗
-║  使显示 PTT +0.01 所需最低谱面定数                ║
-║  当前显示: 12.50 → 目标: 12.51                    ║
-╠═══════════════════════════════════════════════════╣
-║  995W  │ EX+   │  EX   │ 970W  │ 960W  │  AA    ║
-║  11.5  │ 11.8  │ 12.3  │ 12.6  │ 13.0  │ 13.3   ║
-╚═══════════════════════════════════════════════════╝
-```
-
----
-
-## 🛠️ 技术栈
-
-- **JavaScript (ES6+)** - 现代化的开发方式
-- **Chrome Extension Manifest V3** - 最新的扩展标准
-- **MutationObserver API** - 监听页面变化
-- **JSON数据存储** - 轻量级数据管理
-
-
----
-
-## ❓ 常见问题
-
-<details>
-<summary><strong>Q1: 定数/PTT 没有显示怎么办？</strong></summary>
-
-1. 刷新页面（Cmd+R / Ctrl+R）
-2. 检查是否在正确的页面（profile/potential）
-3. 打开控制台（F12）查看是否有错误
-4. 检查扩展设置，确认相关选项已启用
-5. 等待几秒钟让扩展初始化完成
-</details>
-
-<details>
-<summary><strong>Q2: 扩展安全吗？</strong></summary>
-
-完全安全！扩展：
-- ✅ 不访问个人数据
-- ✅ 不发送网络请求
-- ✅ 只在 arcaea.lowiro.com 运行
-- ✅ 完全开源，代码可审查
-</details>
-
-<details>
-<summary><strong>Q3: 支持哪些浏览器？</strong></summary>
-
-- ✅ Chrome（推荐）
-- ✅ Microsoft Edge
-- ✅ Brave
-- ✅ 其他 Chromium 内核浏览器
-- ❌ Firefox or Safari
-</details>
-
-<details>
-<summary><strong>Q4: 如何更新定数和曲目列表数据？</strong></summary>
-
-当 Arcaea 有新曲目或定数变化时，需要手动更新 JSON 数据文件：
-
-**更新步骤：**
-
-1. **获取最新数据** - 访问 Arcaea 中文维基获取最新 JSON 数据：
-   - [ChartConstant.json](https://arcwiki.mcd.blue/index.php?title=Template:ChartConstant.json&action=edit) - 谱面定数数据
-   - [Songlist.json](https://arcwiki.mcd.blue/index.php?title=Template:Songlist.json&action=edit) - 曲目列表数据
-
-2. **复制代码** - 在上述页面中复制完整的 JSON 代码
-
-3. **替换本地文件** - 用复制的内容分别替换扩展文件夹中的：
-   - `ChartConstant.json`
-   - `Songlist.json`
-
-4. **重载扩展** - 在 `chrome://extensions/` 页面点击扩展的刷新按钮
-
-5. **刷新网页** - 重新加载 Arcaea Online 页面即可生效
-
-**注意：**
-- 本仓库会尽量同步更新数据文件，但不保证始终为最新版本
-- 建议在 Arcaea 更新后手动检查并更新数据文件
-- 数据来源于 Arcaea 中文维基社区，感谢数据维护者的贡献
-</details>
-
-<details>
-<summary><strong>Q5: 为什么有些曲目定数显示不出来？</strong></summary>
-
-可能原因：
-- 曲目名称在数据库中不存在
-- 该难度没有定数（某些曲目不是所有难度都有）
-- 曲目名称匹配失败（可查看控制台警告）
-</details>
-
-<details>
-<summary><strong>Q6: 计算的总 PTT 和官方显示不一致？</strong></summary>
-
-这是正常的！扩展显示的是**精确计算值**（保留 4 位小数），而官方显示的是**向下取整到两位小数**的值。
-
-例如：
-- 扩展显示：12.5089
-- 官方显示：12.50
-
-扩展计算更精确，可以帮助你更好地了解推分进度。
-</details>
-
-<details>
-<summary><strong>Q7: 目标分数是如何计算的？</strong></summary>
-
-目标分数（绿色 `>>` 后的数字）是使你的**显示 PTT +0.01** 所需的最低分数。
-
-计算考虑了：
-- 当前总 PTT
-- 当前这首歌的单曲 PTT
-- 谱面定数
-- PTT 显示规则（向下取整到两位小数）
-
-如果显示「无法推分」，说明即使打到 PM（满分）也无法让显示 PTT +0.01。
-</details>
-
-<details>
-<summary><strong>Q8: 定数需求卡片怎么看？</strong></summary>
-
-卡片显示不同分数等级下，使显示 PTT +0.01 所需的**最低谱面定数**。
-
-例如：
-- **995W**：打到 9,950,000+ 分时，需要 11.5 定数的谱面
-- **EX+**：打到 EX+ (9,900,000+) 时，需要 11.8 定数
-- **EX**：打到 EX (9,800,000+) 时，需要 12.3 定数
-
-这可以帮助你规划推分策略：选择合适难度的谱面，用合适的分数来推分。
-</details>
-
----
-
-## 🔧 故障排除
-
-### 扩展无法加载
 ```bash
-# 检查清单：
-□ 确认「开发者模式」已开启
-□ 检查 manifest.json 是否存在且格式正确
-□ 确认所有必需文件都在文件夹中
-□ 查看扩展页面的具体错误提示
+# 安装依赖
+npm install
+
+# 开发模式（监听文件变化，自动同步）
+npm run sync:watch
+
+# 手动同步
+npm run sync
 ```
 
-### 定数显示异常
-```bash
-# 调试步骤：
-1. 打开控制台（F12）
-2. 查看是否有红色错误信息
-3. 运行 test.js 进行诊断
-4. 检查网络请求是否正常
+**⚠️ 重要**: 始终在 `shared_core/` 中修改代码，同步工具会自动复制到各个项目！
+
+详细说明请查看 [scripts/README.md](scripts/README.md)
+
+---
+
+
+
+### 🔄 自动同步说明
+
+- **源文件**: 在 `shared_core/` 中修改
+- **目标文件**: 自动同步到 `chrome_extension/` 和 `arcaea_helper_mobile/`
+- **同步方式**: 运行 `npm run sync:watch` 自动监听变化
+
+
+## 安装和使用
+
+### Chrome 扩展
+
+1. 下载或克隆本仓库
+2. 运行 `npm install && npm run sync` 同步文件
+3. 打开 Chrome，访问 `chrome://extensions/`
+4. 启用"开发者模式"
+5. 点击"加载已解压的扩展程序"
+6. 选择 `chrome_extension` 文件夹
+7. 访问 https://arcaea.lowiro.com/*/profile/potential 即可使用
+
+### 设置选项
+
+点击扩展图标可打开设置面板：
+- **显示图表**：显示/隐藏 Best 30 和 Recent 10 的 PTT 变化图表
+- **显示定数**：在曲目名称旁显示谱面定数
+- **显示单曲PTT**：显示每首歌曲的 PTT 值
+- **显示目标分数**：显示推分目标分数
+- **显示下载按钮**：显示/隐藏截图下载按钮
+
+### 移动应用
+
+1. 确保已安装 Flutter SDK
+2. 运行 `npm install && npm run sync` 同步文件
+3. 进入 `arcaea_helper_mobile` 目录
+4. 运行 `flutter pub get` 安装依赖
+5. 运行 `flutter run` 启动应用
+
+**依赖项**：
+- `flutter_inappwebview: ^6.0.0` - WebView 组件
+- `shared_preferences: ^2.2.2` - 本地存储
+- `path_provider: ^2.1.1` - 路径访问
+
+**特性**：
+- 内置 WebView 浏览 Arcaea Online
+- 自动注入 shared_core 脚本和样式
+- 内置设置面板，无需离开应用
+- 支持刷新和导航
+
+## 技术架构
+
+### 代码共享策略
+
+**新架构（v2.0+）**：
+1. **源文件**: 所有共享代码存放在 `shared_core/`
+2. **同步工具**: 使用 Node.js 脚本自动同步到各项目
+3. **独立部署**: 每个项目拥有自己的文件副本，互不依赖
+4. **开发流程**: 修改 `shared_core/` → 自动同步 → 测试各项目
+
+**优势**：
+- ✅ 文件独立，Chrome 扩展无需加载整个项目
+- ✅ 各项目可独立部署和打包
+- ✅ 保持代码共享的便利性
+- ✅ 避免相对路径引用问题
+
+### 同步规则
+
+| 源文件 | Chrome 扩展 | Flutter 应用 |
+|--------|------------|-------------|
+| `shared_core/js/*.js` | `chrome_extension/js/*.js` | `arcaea_helper_mobile/web/js/*.js` |
+| `shared_core/css/*.css` | `chrome_extension/css/*.css` | `arcaea_helper_mobile/web/css/*.css` |
+| `shared_core/data/*.json` | `chrome_extension/data/*.json` | `arcaea_helper_mobile/assets/data/*.json` |
+
+### Chrome 扩展实现
+
+- 使用 `chrome.runtime.getURL()` 加载 shared_core 资源
+- Manifest V3 配置 `web_accessible_resources` 允许页面访问资源
+- Content Script 引入 shared_core 模块后执行业务逻辑
+
+### Flutter 应用实现
+
+- 使用 `rootBundle.loadString()` 加载 shared_core 资源
+- 通过 `evaluateJavascript()` 注入脚本到 WebView
+- 将 JSON 数据直接传递给 JavaScript 环境
+
+## 算法说明
+
+### PTT 计算公式
+
+```
+单曲PTT =
+  - score >= 10,000,000: constant + 2
+  - score >= 9,800,000:  constant + 1 + (score - 9,800,000) / 200,000
+  - score < 9,800,000:   constant + (score - 9,500,000) / 300,000
 ```
 
+### 总PTT 计算
 
----
+```
+总PTT = (Best 30 单曲PTT之和 + Recent 10 单曲PTT之和) / 40
+显示PTT = floor(总PTT * 100) / 100
+```
 
-## 🎯 已实现功能
+### 目标分数计算
 
-- [x] 谱面定数显示
-- [x] 单曲 PTT 计算和显示
-- [x] 总 PTT 精确计算
-- [x] 推分目标分数提示
-- [x] 定数需求分析卡片
-- [x] Best 30 和 Recent 10 编号
-- [x] 设置页面（图表显示、下载按钮等）
-- [x] 支持页面路由切换
-- [x] 多语言曲目名称支持
+使用二分搜索找到最小分数 S，使得：
+```
+新总PTT = 旧总PTT - 旧单曲PTT/40 + 新单曲PTT/40
+floor(新总PTT * 100) / 100 >= floor(旧总PTT * 100) / 100 + 0.01
+```
 
+### 推分定数计算
 
-## 📄 许可
+计算使显示 PTT +0.01 所需的最低谱面定数，考虑三种场景：
+- 场景A：仅替换 Recent 10 最低值
+- 场景B：仅替换 Best 30 最低值
+- 场景C：同时替换两者
 
-本项目仅供学习和个人使用。
+## 开发指南
 
-**注意事项：**
-- Arcaea 是 lowiro 的注册商标
-- 定数数据来源于公开资料
-- 请勿用于商业用途
+### 开发工作流
 
----
+1. **启动监听模式**
+   ```bash
+   npm run sync:watch
+   ```
 
-## 🙏 致谢
+2. **修改代码**
+   - 在 `shared_core/` 中修改算法、样式或数据
+   - 文件会自动同步到各个项目
 
-- Arcaea 开发团队 lowiro
-- 社区数据贡献者
-- 所有 Arcaea 玩家
+3. **测试**
+   - Chrome 扩展：重新加载扩展，刷新网页
+   - Flutter 应用：热重载或重启应用
 
----
+### 修改算法
 
+编辑 `shared_core/js/arcaea-calculator.js`：
 
-**享受你的 Arcaea 之旅！** 🎵✨
+### 修改样式
+
+编辑 `shared_core/css/arcaea-styles.css`
+
+### 更新数据
+
+替换 `shared_core/data/` 中的 JSON 文件，然后运行 `npm run sync`
+
+## 许可证
+
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
+
+## 致谢
+
+- 感谢 Arcaea 社区维护的谱面定数数据
+- 感谢所有贡献者
+
+## 更新日志
+
+### v0.2.0
+- ✨ 重构为多端架构，支持 Chrome 扩展和基于 Flutter 的 Android / iOS 应用
+- 📦 提取共享核心模块 (shared_core)
+- 🔧 新增 Node.js 自动同步工具
+- 🎨 优化代码结构，提高可维护性
+
+### v0.1.0
+- 🎉 首次发布
+- 📊 支持 Chrome 扩展
+
+## 常见问题
+
+**Q: 为什么需要运行同步工具？**  
+A: 为了保持各项目文件独立，同时共享核心代码。这样 Chrome 扩展和 Flutter 应用都可以独立部署。
+
+**Q: 我可以直接修改 chrome_extension 中的文件吗？**  
+A: 不推荐，因为下次同步会覆盖你的修改。请始终在 `shared_core/` 中修改。
+
+**Q: 同步工具会覆盖我的自定义修改吗？**  
+A: 同步工具只同步特定文件（算法、样式、数据），不会影响各项目特有的文件（如 manifest.json、main.dart 等）。
+
+**Q: Flutter 应用如何更新数据？**  
+A: 在 `shared_core/data/` 中替换 JSON 文件，运行 `npm run sync`，然后 `flutter pub get` 重新构建资源。
+
+## 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## 联系方式
+
+如有问题或建议，请通过 GitHub Issues 联系。
