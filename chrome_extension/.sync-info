@@ -1,0 +1,16 @@
+# 此文件夹中的以下文件由 npm run sync 自动同步
+# 请勿直接修改这些文件，应在 shared_core/ 中修改源文件
+
+同步的文件：
+- js/arcaea-calculator.js          ← shared_core/js/arcaea-calculator.js
+- js/arcaea-data-loader.js         ← shared_core/js/arcaea-data-loader.js
+- css/arcaea-styles.css            ← shared_core/css/arcaea-styles.css
+- data/ChartConstant.json          ← shared_core/data/ChartConstant.json
+- data/Songlist.json               ← shared_core/data/Songlist.json
+
+本地文件（不会被同步覆盖）：
+- content.js
+- popup.html
+- popup.js
+- manifest.json
+- 等等...

@@ -1,0 +1,19 @@
+{
+  "name": "arcaea-online-helper",
+  "version": "1.0.0",
+  "description": "Arcaea Online Helper - Shared Core Sync Tool",
+  "type": "module",
+  "scripts": {
+    "sync": "node scripts/sync-shared-core.js",
+    "sync:watch": "node scripts/sync-shared-core.js --watch",
+    "sync:force": "node scripts/sync-shared-core.js --force"
+  },
+  "keywords": ["arcaea", "sync"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "chokidar": "^3.5.3",
+    "chalk": "^5.3.0",
+    "fs-extra": "^11.2.0"
+  }
+}
