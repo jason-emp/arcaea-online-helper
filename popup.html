@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arcaea Helper 设置</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 320px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #667eea;
+      margin-bottom: 16px;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .logo {
+      font-size: 24px;
+    }
+
+    .settings-section {
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    .setting-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      margin-bottom: 8px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      transition: background-color 0.2s;
+    }
+
+    .setting-item:hover {
+      background: #f0f1f3;
+    }
+
+    .setting-label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+    }
+
+    .setting-label-main {
+      font-size: 14px;
+      font-weight: 500;
+      color: #333;
+    }
+
+    .setting-label-desc {
+      font-size: 12px;
+      color: #888;
+    }
+
+    /* 开关样式 */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 48px;
+      height: 26px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: 0.3s;
+      border-radius: 26px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: #667eea;
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #f0f0f0;
+    }
+
+    .footer-text {
+      font-size: 12px;
+      color: #999;
+    }
+
+    .status-message {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #10b981;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    .status-message.show {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>
+      <span class="logo">🎵</span>
+      Arcaea Helper
+    </h1>
+
+    <div class="settings-section">
+      <div class="section-title">显示设置</div>
+      
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="setting-label-main">显示图表</span>
+          <span class="setting-label-desc">显示 Best 30 / Recent 10 的 PTT 变化图表</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="showCharts">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="setting-label-main">显示定数</span>
+          <span class="setting-label-desc">在曲目名称旁显示谱面定数</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="showConstant" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="setting-label-main">显示单曲PTT</span>
+          <span class="setting-label-desc">在曲目旁显示该曲目的PTT值</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="showPTT" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="setting-label-main">显示目标分数</span>
+          <span class="setting-label-desc">显示使显示PTT +0.01 所需的目标分数</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="showTargetScore" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">
+          <span class="setting-label-main">显示下载按钮</span>
+          <span class="setting-label-desc">显示截图下载和背景选择按钮</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="showDownloadButtons" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p class="footer-text">v1.0 · 设置会自动保存</p>
+      <p class="footer-text" style="margin-top: 8px; color: #f59e0b; font-size: 11px;">
+        💡 提示：需刷新页面生效
+      </p>
+    </div>
+  </div>
+
+  <div class="status-message" id="statusMessage">✓ 设置已保存</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
