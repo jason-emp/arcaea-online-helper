@@ -375,7 +375,7 @@
     }
   }
 
-  function displayTotalPTT(totalPTT) {
+  function displayTotalPTT(totalPTT, best30PTTs, recent10PTTs) {
     try {
       if (document.querySelector('.arcaea-total-ptt')) return;
       
@@ -383,9 +383,18 @@
       if (usernameElements.length === 0) return;
 
       const usernameElement = usernameElements[0];
+      
+      // 计算B30和R10平均值
+      const best30Avg = best30PTTs.length > 0 
+        ? best30PTTs.reduce((sum, ptt) => sum + ptt, 0) / best30PTTs.length 
+        : 0;
+      const recent10Avg = recent10PTTs.length > 0 
+        ? recent10PTTs.reduce((sum, ptt) => sum + ptt, 0) / recent10PTTs.length 
+        : 0;
+      
       const pttSpan = document.createElement('span');
       pttSpan.className = 'arcaea-total-ptt';
-      pttSpan.textContent = ` (PTT: ${totalPTT.toFixed(4)})`;
+      pttSpan.textContent = ` (PTT: ${totalPTT.toFixed(4)} | B30: ${best30Avg.toFixed(4)} | R10: ${recent10Avg.toFixed(4)})`;
       pttSpan.style.color = '#667eea';
       pttSpan.style.fontSize = '0.9em';
       pttSpan.style.fontWeight = '700';
@@ -541,7 +550,7 @@
         console.log(`[Arcaea Helper] Recent 10: ${recent10PTTs.length}首, 总和: ${recent10Sum.toFixed(4)}`);
         console.log(`[Arcaea Helper] 计算的总PTT: ${totalPTT.toFixed(4)}`);
         
-        displayTotalPTT(totalPTT);
+        displayTotalPTT(totalPTT, best30PTTs, recent10PTTs);
         insertPTTIncreaseCard(totalPTT, best30PTTs, recent10PTTs);
         
         // 第二轮：添加目标分数

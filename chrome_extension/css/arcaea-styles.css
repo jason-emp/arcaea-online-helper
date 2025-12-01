@@ -1,5 +1,13 @@
 /* Arcaea Online Chart Constant Helper - Styles */
 
+/* 启用文本选择和复制 */
+* {
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  user-select: text !important;
+}
+
 /* 全局防止横向溢出 */
 html, body {
   overflow-x: hidden !important;
@@ -232,7 +240,7 @@ span.no-overflow ~ .arcaea-chart-info {
   [class*="card-main-user"],
   [data-v-f7bc1a70].card-main-user,
   div[data-v-f7bc1a70].main-card {
-    max-width: 450px !important;
+    max-width: 650px !important;
     margin: 20px auto !important;
     transform: scale(0.75) !important;
     transform-origin: top center !important;
@@ -756,4 +764,5 @@ div[data-v-337fbd7d].diagram-section.arcaea-chart-collapsed {
   .arcaea-chart-toggle {
     max-width: 200px;
   }
+}
 }

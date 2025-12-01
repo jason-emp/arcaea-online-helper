@@ -85,6 +85,21 @@ function showStatusMessage(message, type = 'success') {
   }, 2000);
 }
 
+// 检查更新
+function checkForUpdates() {
+  const releaseUrl = 'https://github.com/jason-emp/arcaea-online-helper/releases/latest';
+  
+  chrome.tabs.create({ url: releaseUrl }, (tab) => {
+    if (chrome.runtime.lastError) {
+      console.error('[Arcaea Helper Settings] 打开更新页面失败:', chrome.runtime.lastError);
+      showStatusMessage('✗ 无法打开更新页面', 'error');
+    } else {
+      console.log('[Arcaea Helper Settings] 已打开更新页面');
+      showStatusMessage('✓ 正在跳转到更新页面');
+    }
+  });
+}
+
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
   // 加载设置
@@ -102,6 +117,9 @@ document.addEventListener('DOMContentLoaded', () => {
   settingCheckboxes.forEach(id => {
     document.getElementById(id).addEventListener('change', saveSettings);
   });
+  
+  // 监听检查更新按钮
+  document.getElementById('checkUpdateButton').addEventListener('click', checkForUpdates);
   
   console.log('[Arcaea Helper Settings] 设置页面已初始化');
 });

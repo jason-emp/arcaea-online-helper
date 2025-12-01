@@ -7,6 +7,32 @@
   console.log('[Arcaea Helper] 🚀 扩展已加载');
   console.log('[Arcaea Helper] 当前页面:', window.location.href);
 
+  // 禁用网页的选中和复制限制
+  (function enableTextSelection() {
+    // 移除所有阻止选择和复制的事件监听器
+    const events = ['selectstart', 'copy', 'cut', 'contextmenu', 'mousedown', 'mouseup'];
+    events.forEach(event => {
+      document.addEventListener(event, function(e) {
+        e.stopPropagation();
+      }, true);
+    });
+
+    // 注入 CSS 以启用文本选择
+    const style = document.createElement('style');
+    style.id = 'arcaea-enable-selection';
+    style.textContent = `
+      * {
+        -webkit-user-select: text !important;
+        -moz-user-select: text !important;
+        -ms-user-select: text !important;
+        user-select: text !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    console.log('[Arcaea Helper] ✅ 已启用文本选择和复制功能');
+  })();
+
   // 默认设置
   const DEFAULT_SETTINGS = {
     showCharts: false,
@@ -394,7 +420,7 @@
     }
   }
 
-  function displayTotalPTT(totalPTT) {
+  function displayTotalPTT(totalPTT, best30PTTs, recent10PTTs) {
     try {
       if (document.querySelector('.arcaea-total-ptt')) {
         return;
@@ -404,9 +430,18 @@
       if (usernameElements.length === 0) return;
 
       const usernameElement = usernameElements[0];
+      
+      // 计算B30和R10平均值
+      const best30Avg = best30PTTs.length > 0 
+        ? best30PTTs.reduce((sum, ptt) => sum + ptt, 0) / best30PTTs.length 
+        : 0;
+      const recent10Avg = recent10PTTs.length > 0 
+        ? recent10PTTs.reduce((sum, ptt) => sum + ptt, 0) / recent10PTTs.length 
+        : 0;
+      
       const pttSpan = document.createElement('span');
       pttSpan.className = 'arcaea-total-ptt';
-      pttSpan.textContent = ` (PTT: ${totalPTT.toFixed(4)})`;
+      pttSpan.textContent = ` (PTT: ${totalPTT.toFixed(4)} | B30: ${best30Avg.toFixed(4)} | R10: ${recent10Avg.toFixed(4)})`;
       pttSpan.style.color = '#667eea';
       pttSpan.style.fontSize = '0.9em';
       pttSpan.style.fontWeight = '700';
@@ -627,7 +662,7 @@
         
         console.log(`[Arcaea Helper] 计算的总PTT: ${totalPTT.toFixed(4)}`);
         
-        displayTotalPTT(totalPTT);
+        displayTotalPTT(totalPTT, best30PTTs, recent10PTTs);
         insertPTTIncreaseCard(totalPTT, best30PTTs, recent10PTTs);
         addTargetScoresToAllCards(totalPTT);
       }

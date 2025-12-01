@@ -261,6 +261,52 @@
       display: inline-flex;
       vertical-align: middle;
     }
+
+    .md-update-section {
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .md-update-button {
+      width: 100%;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 20px;
+      background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-tertiary));
+      color: var(--md-sys-color-on-primary);
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(103, 80, 164, 0.2);
+    }
+
+    .md-update-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(103, 80, 164, 0.3);
+    }
+
+    .md-update-button:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 8px rgba(103, 80, 164, 0.2);
+    }
+
+    .md-update-button .material-symbols-rounded {
+      font-size: 20px;
+    }
+
+    .md-update-description {
+      font-size: 12px;
+      color: var(--md-sys-color-on-surface-variant);
+      text-align: center;
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -350,8 +396,16 @@
       <div class="md-support-card">
         <p>
           设置将立即保存在 <strong>chrome.storage.sync</strong> 中，刷新 Arcaea 页面即可生效。
-          如果某个开关无响应，请确认页面已安装最新版本扩展。
+          如果某个开关无响应,请确认页面已安装最新版本扩展。
         </p>
+      </div>
+
+      <div class="md-update-section">
+        <button class="md-update-button" id="checkUpdateButton">
+          <span class="material-symbols-rounded" aria-hidden="true">download</span>
+          <span>检查更新</span>
+        </button>
+        <p class="md-update-description">跳转至 GitHub 发布页下载最新版本</p>
       </div>
 
       <footer class="md-footer">

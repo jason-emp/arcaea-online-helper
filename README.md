@@ -1,5 +1,7 @@
 # Arcaea Online Helper
 
+[![Latest Release](https://img.shields.io/github/v/release/jason-emp/arcaea-online-helper?label=下载最新版本&style=for-the-badge&color=6750a4)](https://github.com/jason-emp/arcaea-online-helper/releases/latest)
+
 一个增强 Arcaea Online 查分页面的跨平台工具，支持 Android、 iOS 和 Chrome 扩展（Windows、 macOS、 Linux）。
 
 ## 功能特性

@@ -9,7 +9,7 @@ package-lock.json
 .vscode/
 .idea/
 *.iml
-
+.copilot/
 # OS
 .DS_Store
 Thumbs.db
