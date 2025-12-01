@@ -64,14 +64,20 @@ async function saveSettings() {
 // 显示状态消息
 function showStatusMessage(message, type = 'success') {
   const statusElement = document.getElementById('statusMessage');
-  statusElement.textContent = message;
-  
+  const textElement = statusElement.querySelector('[data-snackbar-text]');
+  const iconElement = statusElement.querySelector('[data-snackbar-icon]');
+
+  textElement.textContent = message;
+  statusElement.classList.remove('success', 'error');
+
   if (type === 'error') {
-    statusElement.style.background = '#ef4444';
+    statusElement.classList.add('error');
+    if (iconElement) iconElement.textContent = 'error';
   } else {
-    statusElement.style.background = '#10b981';
+    statusElement.classList.add('success');
+    if (iconElement) iconElement.textContent = 'check_circle';
   }
-  
+
   statusElement.classList.add('show');
   
   setTimeout(() => {

@@ -4,7 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Arcaea Helper 设置</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Material+Symbols+Rounded" rel="stylesheet">
   <style>
+    :root {
+      color-scheme: light;
+      --md-sys-color-primary: #6750a4;
+      --md-sys-color-on-primary: #ffffff;
+      --md-sys-color-surface: #fffbfe;
+      --md-sys-color-surface-container: #f7f2fa;
+      --md-sys-color-outline: #7a7289;
+      --md-sys-color-on-surface: #1c1b1f;
+      --md-sys-color-on-surface-variant: #49454f;
+      --md-sys-color-tertiary: #7d5260;
+      font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
     * {
       margin: 0;
       padding: 0;
@@ -12,238 +28,342 @@
     }
 
     body {
-      width: 320px;
+      min-width: 360px;
+      max-width: 420px;
+      padding: 0;
+      background: radial-gradient(circle at top, rgba(103, 80, 164, 0.18), transparent 60%),
+        radial-gradient(circle at bottom, rgba(125, 82, 96, 0.12), transparent 55%),
+        #ece6f0;
+      color: var(--md-sys-color-on-surface);
+    }
+
+    .md-app {
       padding: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #333;
     }
 
-    .container {
-      background: white;
-      border-radius: 12px;
-      padding: 20px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    .md-surface {
+      background: var(--md-sys-color-surface);
+      border-radius: 20px;
+      box-shadow: 0 1px 3px rgba(28, 27, 31, 0.18), 0 4px 12px rgba(28, 27, 31, 0.08);
+      padding: 18px 20px 20px;
+      border: 1px solid rgba(103, 80, 164, 0.08);
     }
 
-    h1 {
-      font-size: 20px;
-      font-weight: 700;
-      color: #667eea;
-      margin-bottom: 16px;
-      text-align: center;
+    .md-top-app-bar {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-
-    .logo {
-      font-size: 24px;
-    }
-
-    .settings-section {
-      margin-bottom: 20px;
-    }
-
-    .section-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: #555;
+      gap: 12px;
       margin-bottom: 12px;
-      padding-bottom: 6px;
-      border-bottom: 2px solid #f0f0f0;
     }
 
-    .setting-item {
+    .md-app-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #6750a4, #7d5260);
+      color: var(--md-sys-color-on-primary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .md-top-app-bar h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--md-sys-color-on-surface);
+      letter-spacing: 0.02em;
+    }
+
+    .md-subtitle {
+      font-size: 13px;
+      color: var(--md-sys-color-on-surface-variant);
+      margin-top: 2px;
+    }
+
+    .md-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--md-sys-color-on-surface-variant);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin: 16px 0 8px;
+    }
+
+    .md-card {
+      border-radius: 16px;
+      background: var(--md-sys-color-surface-container);
+      padding: 4px 0;
+      border: 1px solid rgba(28, 27, 31, 0.08);
+    }
+
+    .md-setting-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px;
-      margin-bottom: 8px;
-      background: #f8f9fa;
-      border-radius: 8px;
-      transition: background-color 0.2s;
+      padding: 12px 16px;
+      gap: 16px;
+      transition: background-color 0.2s ease;
     }
 
-    .setting-item:hover {
-      background: #f0f1f3;
+    .md-setting-row + .md-setting-row {
+      border-top: 1px solid rgba(28, 27, 31, 0.06);
     }
 
-    .setting-label {
+    .md-setting-row:focus-within,
+    .md-setting-row:hover {
+      background: rgba(103, 80, 164, 0.08);
+    }
+
+    .md-setting-text {
+      flex: 1;
       display: flex;
       flex-direction: column;
       gap: 4px;
-      flex: 1;
     }
 
-    .setting-label-main {
+    .md-setting-text strong {
       font-size: 14px;
-      font-weight: 500;
-      color: #333;
+      font-weight: 600;
+      color: var(--md-sys-color-on-surface);
     }
 
-    .setting-label-desc {
+    .md-setting-text span {
       font-size: 12px;
-      color: #888;
+      color: var(--md-sys-color-on-surface-variant);
+      line-height: 1.4;
     }
 
-    /* 开关样式 */
-    .switch {
+    .md-switch {
       position: relative;
-      display: inline-block;
-      width: 48px;
-      height: 26px;
+      display: inline-flex;
+      width: 52px;
+      height: 32px;
+      align-items: center;
+      justify-content: center;
     }
 
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .slider {
+    .md-switch input {
       position: absolute;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
       cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: #ccc;
-      transition: 0.3s;
-      border-radius: 26px;
+      margin: 0;
     }
 
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 20px;
-      width: 20px;
-      left: 3px;
-      bottom: 3px;
-      background-color: white;
-      transition: 0.3s;
+    .md-switch-track {
+      width: 36px;
+      height: 16px;
+      border-radius: 16px;
+      background: rgba(28, 27, 31, 0.28);
+      position: relative;
+      transition: background 0.25s ease;
+    }
+
+    .md-switch-thumb {
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
+      background: var(--md-sys-color-surface);
+      position: absolute;
+      top: 50%;
+      left: -6px;
+      transform: translateY(-50%);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.24);
+      border: 1px solid rgba(28, 27, 31, 0.15);
+      transition: left 0.25s ease, background 0.25s ease, border 0.25s ease;
     }
 
-    input:checked + .slider {
-      background-color: #667eea;
+    .md-switch input:checked + .md-switch-track {
+      background: rgba(103, 80, 164, 0.35);
     }
 
-    input:checked + .slider:before {
-      transform: translateX(22px);
+    .md-switch input:checked + .md-switch-track .md-switch-thumb {
+      left: 14px;
+      background: var(--md-sys-color-primary);
+      border-color: transparent;
+      color: var(--md-sys-color-on-primary);
     }
 
-    .footer {
-      text-align: center;
+    .md-switch input:focus-visible + .md-switch-track {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 4px;
+    }
+
+    .md-support-card {
       margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid #f0f0f0;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(103, 80, 164, 0.08), rgba(125, 82, 96, 0.1));
+      border: 1px solid rgba(103, 80, 164, 0.1);
     }
 
-    .footer-text {
+    .md-support-card p {
       font-size: 12px;
-      color: #999;
+      color: var(--md-sys-color-on-surface-variant);
+      line-height: 1.4;
     }
 
-    .status-message {
+    .md-support-card strong {
+      color: var(--md-sys-color-primary);
+    }
+
+    .md-footer {
+      margin-top: 16px;
+      text-align: center;
+    }
+
+    .md-footer p {
+      font-size: 11px;
+      color: var(--md-sys-color-on-surface-variant);
+      line-height: 1.4;
+    }
+
+    .md-snackbar {
       position: fixed;
-      top: 16px;
       left: 50%;
-      transform: translateX(-50%);
-      background: #10b981;
+      bottom: 16px;
+      transform: translate(-50%, 150%);
+      min-width: 220px;
+      max-width: 320px;
       color: white;
-      padding: 8px 16px;
-      border-radius: 6px;
+      padding: 12px 16px;
+      border-radius: 24px;
       font-size: 13px;
-      font-weight: 500;
-      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.24);
+      transition: transform 0.3s ease, opacity 0.3s ease;
       opacity: 0;
-      transition: opacity 0.3s;
-      pointer-events: none;
-      z-index: 1000;
+      z-index: 2;
     }
 
-    .status-message.show {
+    .md-snackbar.success {
+      background: #312f33;
+    }
+
+    .md-snackbar.error {
+      background: #b3261e;
+    }
+
+    .md-snackbar.show {
+      transform: translate(-50%, 0);
       opacity: 1;
+    }
+
+    .material-symbols-rounded {
+      font-family: 'Material Symbols Rounded';
+      font-weight: normal;
+      font-style: normal;
+      font-size: 18px;
+      display: inline-flex;
+      vertical-align: middle;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>
-      <span class="logo">🎵</span>
-      Arcaea Helper
-    </h1>
-
-    <div class="settings-section">
-      <div class="section-title">显示设置</div>
-      
-      <div class="setting-item">
-        <div class="setting-label">
-          <span class="setting-label-main">显示图表</span>
-          <span class="setting-label-desc">显示 Best 30 / Recent 10 的 PTT 变化图表</span>
+  <div class="md-app">
+    <div class="md-surface" role="region" aria-label="Arcaea Helper 设置">
+      <header class="md-top-app-bar">
+        <div class="md-app-icon">
+          <span class="material-symbols-rounded" aria-hidden="true">graphic_eq</span>
         </div>
-        <label class="switch">
-          <input type="checkbox" id="showCharts">
-          <span class="slider"></span>
-        </label>
+        <div>
+          <h1>Arcaea Helper</h1>
+          <p class="md-subtitle">个性化你的浏览体验</p>
+        </div>
+      </header>
+
+      <p class="md-section-title">显示设置</p>
+      <section class="md-card" aria-label="显示设置">
+        <div class="md-setting-row">
+          <div class="md-setting-text">
+            <strong>显示图表</strong>
+            <span>展示 Best 30 / Recent 10 的 PTT 变化曲线</span>
+          </div>
+          <label class="md-switch">
+            <input type="checkbox" id="showCharts">
+            <span class="md-switch-track" aria-hidden="true">
+              <span class="md-switch-thumb"></span>
+            </span>
+          </label>
+        </div>
+
+        <div class="md-setting-row">
+          <div class="md-setting-text">
+            <strong>显示定数</strong>
+            <span>在曲目名称旁同步显示谱面定数</span>
+          </div>
+          <label class="md-switch">
+            <input type="checkbox" id="showConstant" checked>
+            <span class="md-switch-track" aria-hidden="true">
+              <span class="md-switch-thumb"></span>
+            </span>
+          </label>
+        </div>
+
+        <div class="md-setting-row">
+          <div class="md-setting-text">
+            <strong>显示单曲 PTT</strong>
+            <span>在曲目列表中标注当前成绩对应的 PTT</span>
+          </div>
+          <label class="md-switch">
+            <input type="checkbox" id="showPTT" checked>
+            <span class="md-switch-track" aria-hidden="true">
+              <span class="md-switch-thumb"></span>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <p class="md-section-title">辅助工具</p>
+      <section class="md-card" aria-label="辅助工具设置">
+        <div class="md-setting-row">
+          <div class="md-setting-text">
+            <strong>显示目标分数</strong>
+            <span>给出提升 0.01 PTT 所需的目标分数提示</span>
+          </div>
+          <label class="md-switch">
+            <input type="checkbox" id="showTargetScore" checked>
+            <span class="md-switch-track" aria-hidden="true">
+              <span class="md-switch-thumb"></span>
+            </span>
+          </label>
+        </div>
+
+        <div class="md-setting-row">
+          <div class="md-setting-text">
+            <strong>显示下载按钮</strong>
+            <span>保留截图下载与背景选择控制</span>
+          </div>
+          <label class="md-switch">
+            <input type="checkbox" id="showDownloadButtons" checked>
+            <span class="md-switch-track" aria-hidden="true">
+              <span class="md-switch-thumb"></span>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <div class="md-support-card">
+        <p>
+          设置将立即保存在 <strong>chrome.storage.sync</strong> 中，刷新 Arcaea 页面即可生效。
+          如果某个开关无响应，请确认页面已安装最新版本扩展。
+        </p>
       </div>
 
-      <div class="setting-item">
-        <div class="setting-label">
-          <span class="setting-label-main">显示定数</span>
-          <span class="setting-label-desc">在曲目名称旁显示谱面定数</span>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="showConstant" checked>
-          <span class="slider"></span>
-        </label>
-      </div>
-
-      <div class="setting-item">
-        <div class="setting-label">
-          <span class="setting-label-main">显示单曲PTT</span>
-          <span class="setting-label-desc">在曲目旁显示该曲目的PTT值</span>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="showPTT" checked>
-          <span class="slider"></span>
-        </label>
-      </div>
-
-      <div class="setting-item">
-        <div class="setting-label">
-          <span class="setting-label-main">显示目标分数</span>
-          <span class="setting-label-desc">显示使显示PTT +0.01 所需的目标分数</span>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="showTargetScore" checked>
-          <span class="slider"></span>
-        </label>
-      </div>
-
-      <div class="setting-item">
-        <div class="setting-label">
-          <span class="setting-label-main">显示下载按钮</span>
-          <span class="setting-label-desc">显示截图下载和背景选择按钮</span>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="showDownloadButtons" checked>
-          <span class="slider"></span>
-        </label>
-      </div>
-    </div>
-
-    <div class="footer">
-      <p class="footer-text">v1.0 · 设置会自动保存</p>
-      <p class="footer-text" style="margin-top: 8px; color: #f59e0b; font-size: 11px;">
-        💡 提示：需刷新页面生效
-      </p>
+      <footer class="md-footer">
+        <p>提示：刷新页面后最新设置才会同步到网页</p>
+      </footer>
     </div>
   </div>
 
-  <div class="status-message" id="statusMessage">✓ 设置已保存</div>
+  <div class="md-snackbar success" id="statusMessage" role="status" aria-live="polite">
+    <span class="material-symbols-rounded" aria-hidden="true" data-snackbar-icon>check_circle</span>
+    <span data-snackbar-text>设置已保存</span>
+  </div>
 
   <script src="popup.js"></script>
 </body>
