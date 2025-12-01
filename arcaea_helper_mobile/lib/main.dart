@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:gal/gal.dart';
+
+import 'models/b30r10_data.dart';
+import 'services/image_generator_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -80,6 +86,11 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   String? _cachedStyles;
   String? _cachedChartConstant;
   String? _cachedSonglist;
+
+  // 图片生成状态
+  bool _isGeneratingImage = false;
+  String _generationProgress = '';
+  B30R10Data? _cachedB30R10Data;
 
   @override
   void initState() {
@@ -175,6 +186,13 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
         title: const Text('Arcaea Helper'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          // 生成图片按钮
+          if (_isTargetPage && _cachedB30R10Data != null && !_isGeneratingImage)
+            IconButton(
+              icon: const Icon(Icons.image),
+              tooltip: '生成B30/R10图片',
+              onPressed: _generateImage,
+            ),
           IconButton(
             icon: Icon(showSettings ? Icons.close : Icons.settings),
             onPressed: () {
@@ -202,6 +220,30 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
                 Theme.of(context).colorScheme.primary,
               ),
             ),
+          if (_isGeneratingImage)
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: Colors.blue.shade50,
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      _generationProgress,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.blue.shade900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           if (showSettings)
             _buildSettingsPanel(),
           Expanded(
@@ -227,6 +269,34 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
                   callback: (args) async {
                     final assetPath = args[0] as String;
                     return await _loadAssetAsString(assetPath);
+                  },
+                );
+
+                // 添加导出B30/R10数据的处理器
+                controller.addJavaScriptHandler(
+                  handlerName: 'exportB30R10Data',
+                  callback: (args) async {
+                    debugPrint('[Arcaea Helper] 接收到B30/R10数据');
+                    try {
+                      final jsonData = args[0] as Map<String, dynamic>;
+                      _cachedB30R10Data = B30R10Data.fromJson(jsonData);
+                      debugPrint('[Arcaea Helper] 数据已缓存: ${_cachedB30R10Data!.player.username}');
+                      
+                      // 显示提示
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('数据已准备: ${_cachedB30R10Data!.player.username}'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                      
+                      return {'success': true};
+                    } catch (e) {
+                      debugPrint('[Arcaea Helper] 解析数据失败: $e');
+                      return {'success': false, 'error': e.toString()};
+                    }
                   },
                 );
               },
@@ -380,6 +450,26 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
             },
           ),
           const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _isTargetPage && !_isGeneratingImage ? _generateImage : null,
+                  icon: const Icon(Icons.image),
+                  label: const Text('生成B30/R10图片'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '自动获取页面数据并生成精美图片',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: _launchLatestRelease,
             icon: const Icon(Icons.download),
@@ -447,6 +537,140 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('无法打开浏览器，请稍后再试')),
       );
+    }
+  }
+
+  /// 从WebView获取B30/R10数据
+  Future<void> _fetchB30R10Data() async {
+    if (webViewController == null) return;
+
+    try {
+      debugPrint('[Arcaea Helper] 开始获取B30/R10数据...');
+      
+      await webViewController!.evaluateJavascript(source: '''
+        (async function() {
+          if (typeof window.exportB30R10Data === 'function') {
+            const data = await window.exportB30R10Data();
+            if (data) {
+              window.flutter_inappwebview.callHandler('exportB30R10Data', data);
+              console.log('[Arcaea Helper] 数据已发送到Flutter');
+            } else {
+              console.error('[Arcaea Helper] 数据导出失败');
+            }
+          } else {
+            console.error('[Arcaea Helper] exportB30R10Data 函数不存在');
+          }
+        })();
+      ''');
+    } catch (e) {
+      debugPrint('[Arcaea Helper] 获取数据失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('获取数据失败: $e')),
+        );
+      }
+    }
+  }
+
+  /// 生成B30/R10图片
+  Future<void> _generateImage() async {
+    if (_cachedB30R10Data == null) {
+      // 如果没有缓存数据，先获取
+      await _fetchB30R10Data();
+      
+      // 等待一小段时间让数据处理完成
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      if (_cachedB30R10Data == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('请等待数据加载完成后再试')),
+          );
+        }
+        return;
+      }
+    }
+
+    setState(() {
+      _isGeneratingImage = true;
+      _generationProgress = '准备生成图片...';
+    });
+
+    try {
+      // 请求存储权限
+      if (Platform.isAndroid || Platform.isIOS) {
+        final hasAccess = await Gal.hasAccess();
+        if (!hasAccess) {
+          final granted = await Gal.requestAccess();
+          if (!granted) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('需要相册访问权限才能保存图片')),
+              );
+            }
+            setState(() {
+              _isGeneratingImage = false;
+              _generationProgress = '';
+            });
+            return;
+          }
+        }
+        debugPrint('[Arcaea Helper] 已获得相册访问权限');
+      }
+
+      // 生成图片
+      final imageBytes = await ImageGeneratorService.generateImage(
+        _cachedB30R10Data!,
+        onProgress: (progress) {
+          if (mounted) {
+            setState(() {
+              _generationProgress = progress;
+            });
+          }
+        },
+      );
+
+      // 保存图片到临时目录
+      final tempDir = await getTemporaryDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'arcaea-b30r10-${_cachedB30R10Data!.player.username}-$timestamp.png';
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsBytes(imageBytes);
+
+      debugPrint('[Arcaea Helper] 图片已生成: ${file.path}');
+
+      // 保存到相册
+      await Gal.putImage(file.path, album: 'Arcaea Helper');
+      debugPrint('[Arcaea Helper] 图片已保存到相册');
+
+      setState(() {
+        _isGeneratingImage = false;
+        _generationProgress = '';
+      });
+
+      // 显示成功提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('图片已保存到相册: $fileName'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('[Arcaea Helper] 生成图片失败: $e');
+      debugPrint('[Arcaea Helper] 堆栈: $stackTrace');
+      
+      setState(() {
+        _isGeneratingImage = false;
+        _generationProgress = '';
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('生成图片失败: $e')),
+        );
+      }
     }
   }
 

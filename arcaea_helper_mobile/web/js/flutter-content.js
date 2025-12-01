@@ -323,6 +323,34 @@
     }
   }
 
+  // 在移动端第一个卡片添加 B30/R10 信息
+  function addB30R10InfoToFirstCard(best30Avg, recent10Avg) {
+    try {
+      const firstCard = document.querySelector('.card-list [data-v-337fbd7d].card');
+      if (!firstCard) return;
+      
+      // 移除已存在的信息
+      const existing = firstCard.querySelector('.arcaea-b30r10-info');
+      if (existing) existing.remove();
+      
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'arcaea-b30r10-info';
+      infoDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-around; padding: 8px 12px; margin-bottom: 8px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(234, 88, 12, 0.1) 100%); border-radius: 8px; border: 1px solid rgba(102, 126, 234, 0.2);">
+          <span style="font-size: 13px; font-weight: 600; color: #667eea;">B30: ${best30Avg.toFixed(4)}</span>
+          <span style="font-size: 13px; font-weight: 600; color: #ea580c;">R10: ${recent10Avg.toFixed(4)}</span>
+        </div>
+      `;
+      
+      const albumData = firstCard.querySelector('.album-data, [data-v-b3942f14]');
+      if (albumData) {
+        albumData.insertBefore(infoDiv, albumData.firstChild);
+      }
+    } catch (error) {
+      console.error('[Arcaea Helper] 添加B30/R10信息失败:', error);
+    }
+  }
+
   function processCard(cardElement, index = null, isRecent = false, totalPTT = null) {
     if (cardElement.classList.contains('arcaea-processed')) {
       const pttElement = cardElement.querySelector('.arcaea-play-ptt');
@@ -395,6 +423,14 @@
       const pttSpan = document.createElement('span');
       pttSpan.className = 'arcaea-total-ptt';
       pttSpan.textContent = ` (PTT: ${totalPTT.toFixed(4)} | B30: ${best30Avg.toFixed(4)} | R10: ${recent10Avg.toFixed(4)})`;
+      pttSpan.style.color = '#667eea';
+      pttSpan.style.fontSize = '0.9em';
+      pttSpan.style.fontWeight = '700';
+      
+      // 在移动端，将B30/R10信息添加到第一个卡片
+      if (window.innerWidth <= 767) {
+        addB30R10InfoToFirstCard(best30Avg, recent10Avg);
+      }
       pttSpan.style.color = '#667eea';
       pttSpan.style.fontSize = '0.9em';
       pttSpan.style.fontWeight = '700';
@@ -646,6 +682,180 @@
 
   // 应用初始样式（不触发卡片处理）
   applyInitialStyles();
+
+  // 导出B30/R10数据（供Flutter图片生成使用）
+  window.exportB30R10Data = async function() {
+    console.log('[Arcaea Helper] 开始导出B30/R10数据...');
+    
+    try {
+      // 获取所有卡片
+      const cardLists = document.querySelectorAll('.card-list, [class*="card-list"]');
+      if (cardLists.length === 0) {
+        console.error('[Arcaea Helper] 未找到卡片列表');
+        return null;
+      }
+
+      const best30Cards = [];
+      const recent10Cards = [];
+      const allCards = [];
+
+      // 收集所有卡片
+      cardLists.forEach((cardList, listIndex) => {
+        const cards = cardList.querySelectorAll('[data-v-b3942f14].card');
+        console.log(`[Arcaea Helper] 列表 ${listIndex}: 找到 ${cards.length} 张卡片`);
+
+        cards.forEach((cardElement, cardIndex) => {
+          const { title, score } = getSongTitleAndScoreFromCard(cardElement);
+          const difficulty = getDifficultyFromElement(cardElement);
+
+          if (!title || score === null || difficulty === null) {
+            console.warn(`[Arcaea Helper] 跳过不完整的卡片 ${cardIndex}`);
+            return;
+          }
+
+          // 获取定数
+          const constant = dataLoader ? dataLoader.getChartConstant(title, difficulty, false) : null;
+          
+          // 获取曲绘URL - 从DOM中提取实际的图片
+          let coverUrl = null;
+          
+          // 首先查找所有元素的背景图片
+          const allElements = cardElement.querySelectorAll('*');
+          for (const el of allElements) {
+            const bgStyle = window.getComputedStyle(el).backgroundImage;
+            if (bgStyle && bgStyle !== 'none') {
+              const urlMatch = bgStyle.match(/url\(["']?([^"']+)["']?\)/);
+              if (urlMatch && urlMatch[1] && 
+                  !urlMatch[1].startsWith('data:image/svg') && 
+                  (urlMatch[1].includes('.jpg') || urlMatch[1].includes('.png') || 
+                   urlMatch[1].includes('.webp') || urlMatch[1].includes('img'))) {
+                coverUrl = urlMatch[1];
+                break;
+              }
+            }
+          }
+          
+          // 如果还是没找到，尝试img标签
+          if (!coverUrl) {
+            const imgs = cardElement.querySelectorAll('img');
+            for (const img of imgs) {
+              if (img.src && !img.src.startsWith('data:image/svg') && 
+                  (img.src.includes('.jpg') || img.src.includes('.png') || 
+                   img.src.includes('.webp') || img.src.includes('img'))) {
+                coverUrl = img.src;
+                break;
+              }
+            }
+          }
+
+          // 计算单曲PTT
+          let playPTT = null;
+          if (constant !== null) {
+            if (score >= 10000000) {
+              playPTT = constant + 2;
+            } else if (score >= 9800000) {
+              playPTT = constant + 1 + (score - 9800000) / 200000;
+            } else {
+              playPTT = constant + (score - 9500000) / 300000;
+              if (playPTT < 0) playPTT = 0;
+            }
+          }
+
+          const difficultyNames = ['PST', 'PRS', 'FTR', 'BYD', 'ETR'];
+          const cardData = {
+            songTitle: title,
+            difficulty: difficultyNames[difficulty] || 'FTR',
+            difficultyIndex: difficulty,
+            score: score,
+            constant: constant,
+            playPTT: playPTT,
+            coverUrl: coverUrl,
+            rank: 0 // 稍后设置
+          };
+
+          allCards.push(cardData);
+        });
+      });
+
+      // 分割为Best 30和Recent 10
+      // 前30张是Best 30，后面的是Recent 10
+      for (let i = 0; i < allCards.length && i < 30; i++) {
+        allCards[i].rank = i + 1;
+        best30Cards.push(allCards[i]);
+      }
+      
+      for (let i = 30; i < allCards.length; i++) {
+        allCards[i].rank = i - 29; // R1, R2, ...
+        recent10Cards.push(allCards[i]);
+      }
+
+      // 获取玩家信息
+      let username = 'Player';
+      let totalPTT = null;
+      let best30Avg = null;
+      let recent10Avg = null;
+
+      // 尝试从页面获取玩家名
+      const usernameElement = document.querySelector('.username, [class*="username"]');
+      if (usernameElement) {
+        username = usernameElement.textContent.trim();
+      }
+
+      // 尝试从页面获取PTT信息
+      const pttElement = document.querySelector('.ptt, [class*="ptt"]');
+      if (pttElement) {
+        const pttText = pttElement.textContent.trim();
+        const pttMatch = pttText.match(/([\d.]+)/);
+        if (pttMatch) {
+          totalPTT = parseFloat(pttMatch[1]);
+        }
+      }
+
+      // 如果页面没有显示，计算B30和R10平均
+      if (best30Cards.length > 0) {
+        const validB30 = best30Cards.filter(c => c.playPTT !== null);
+        if (validB30.length > 0) {
+          best30Avg = validB30.reduce((sum, c) => sum + c.playPTT, 0) / validB30.length;
+        }
+      }
+
+      if (recent10Cards.length > 0) {
+        const validR10 = recent10Cards.filter(c => c.playPTT !== null);
+        if (validR10.length > 0) {
+          recent10Avg = validR10.reduce((sum, c) => sum + c.playPTT, 0) / validR10.length;
+        }
+      }
+
+      // 如果总PTT未知但有B30和R10，计算总PTT
+      if (totalPTT === null && best30Avg !== null && recent10Avg !== null) {
+        totalPTT = (best30Avg * 30 + recent10Avg * 10) / 40;
+      }
+
+      const exportData = {
+        player: {
+          username: username,
+          totalPTT: totalPTT,
+          best30Avg: best30Avg,
+          recent10Avg: recent10Avg,
+          exportDate: new Date().toISOString()
+        },
+        best30: best30Cards,
+        recent10: recent10Cards
+      };
+
+      console.log('[Arcaea Helper] ✅ 数据导出成功:', {
+        username: username,
+        best30Count: best30Cards.length,
+        recent10Count: recent10Cards.length,
+        totalPTT: totalPTT
+      });
+
+      return exportData;
+    } catch (error) {
+      console.error('[Arcaea Helper] ❌ 导出数据失败:', error);
+      return null;
+    }
+  };
 
   // 标记脚本已就绪（所有函数定义完成后才设置）
   window.arcaeaHelperReady = true;

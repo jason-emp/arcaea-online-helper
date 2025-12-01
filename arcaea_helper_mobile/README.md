@@ -16,6 +16,18 @@
 - 📈 **定数需求卡片** - 展示达到 +0.01 PTT 所需的最低谱面定数（EX+、EX、995W 等）
 - 🔢 **曲目编号** - 自动为 Best 30 (#1-#30) 和 Recent 10 (R1-R10) 添加序号
 - 📍 **分隔线** - 在 Best 30 和 Recent 10 之间添加视觉分隔
+- 🖼️ **图片生成** - 一键生成精美的 B30/R10 图片（2400x3900高分辨率）
+
+### 🎨 图片生成功能 ✨新增
+- 📸 **一键生成** - 直接在手机上生成精美的 B30/R10 图片
+- 🎨 **高清输出** - 2400x3900 像素，PNG 格式
+- 📊 **完整信息** - 包含所有歌曲卡片、定数、PTT、目标分数
+- 🖼️ **精美设计** - 曲绘背景、渐变效果、专业排版
+- 📱 **即时分享** - 生成完成后直接分享到社交媒体或保存
+- ⚡ **自动提取** - 无需手动导出，自动从页面获取数据
+- 📈 **实时进度** - 显示生成进度，清晰了解处理状态
+
+👉 [查看图片生成详细指南](./IMAGE_GENERATOR_GUIDE.md) | [快速开始](./QUICKSTART_IMAGE_GENERATOR.md)
 
 ### 📱 移动端特性
 - 📲 **内置 WebView** - 无需切换应用，直接在应用内浏览 Arcaea Online
@@ -150,6 +162,10 @@ dependencies:
   flutter_inappwebview: ^6.0.0    # 内置 WebView 组件
   shared_preferences: ^2.2.2      # 本地设置存储
   path_provider: ^2.1.1           # 文件路径访问
+  image: ^4.1.7                   # 图片处理（图片生成）
+  http: ^1.2.0                    # 网络请求（加载曲绘）
+  permission_handler: ^11.3.0     # 权限管理
+  share_plus: ^7.2.1              # 分享功能
 ```
 
 ### 代码共享策略
@@ -452,7 +468,12 @@ arcaea_helper_mobile/
 ├── android/                    # Android 平台配置
 ├── ios/                        # iOS 平台配置
 ├── lib/
-│   └── main.dart              # 主应用代码
+│   ├── main.dart              # 主应用代码
+│   ├── models/
+│   │   └── b30r10_data.dart   # B30/R10 数据模型
+│   └── services/
+│       ├── image_generator_config.dart   # 图片生成配置
+│       └── image_generator_service.dart  # 图片生成服务
 ├── web/                       # WebView 资源（从 shared_core 同步）
 │   ├── js/
 │   │   ├── arcaea-calculator.js
@@ -464,14 +485,9 @@ arcaea_helper_mobile/
 │   └── data/                  # 数据文件（从 shared_core 同步）
 │       ├── ChartConstant.json
 │       └── Songlist.json
-├── pubspec.yaml              # Flutter 依赖配置
-└── README.md                 # 本文档
-```
-
----
-
-## 🎯 路线图
-
+├── IMAGE_GENERATOR_GUIDE.md   # 图片生成详细指南
+├── QUICKSTART_IMAGE_GENERATOR.md  # 图片生成快速开始
+├── IMAGE_GENERATOR_MIGRATION.md   # 技术移植文档
 ### 已实现功能
 - [x] 基础 WebView 集成
 - [x] shared_core 脚本注入
@@ -480,7 +496,20 @@ arcaea_helper_mobile/
 - [x] 所有核心计算功能
 - [x] Android 支持
 - [x] iOS 支持
+- [x] **B30/R10 图片生成** ✨新
+- [x] **自动数据提取** ✨新
+- [x] **即时分享功能** ✨新
 
+### 计划功能
+- [ ] 应用内更新数据文件
+- [ ] 自定义主题色
+- [ ] 离线模式（缓存页面）
+- [ ] 多账号切换
+- [ ] 推分目标跟踪
+- [ ] 成绩历史记录
+- [ ] 导出成绩报告
+- [ ] 图片模板自定义
+- [ ] 离线曲绘缓存
 ### 计划功能
 - [ ] 应用内更新数据文件
 - [ ] 自定义主题色
