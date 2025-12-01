@@ -307,6 +307,34 @@
       text-align: center;
       line-height: 1.4;
     }
+
+    .md-export-button {
+      width: 40px;
+      height: 40px;
+      border: none;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-tertiary));
+      color: var(--md-sys-color-on-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 4px rgba(103, 80, 164, 0.2);
+    }
+
+    .md-export-button:hover {
+      transform: scale(1.1);
+      box-shadow: 0 4px 8px rgba(103, 80, 164, 0.3);
+    }
+
+    .md-export-button:active {
+      transform: scale(0.95);
+    }
+
+    .md-export-button .material-symbols-rounded {
+      font-size: 22px;
+    }
   </style>
 </head>
 <body>
@@ -390,6 +418,19 @@
               <span class="md-switch-thumb"></span>
             </span>
           </label>
+        </div>
+      </section>
+
+      <p class="md-section-title">数据导出</p>
+      <section class="md-card" aria-label="数据导出">
+        <div class="md-setting-row">
+          <div class="md-setting-text">
+            <strong>导出B30/R10数据</strong>
+            <span>导出完整数据JSON文件，用于生成图片</span>
+          </div>
+          <button class="md-export-button" id="exportDataButton">
+            <span class="material-symbols-rounded" aria-hidden="true">download</span>
+          </button>
         </div>
       </section>
 

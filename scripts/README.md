@@ -1,6 +1,59 @@
-# Shared Core 同步工具
+# Scripts 目录说明
+
+本目录包含项目的实用脚本工具。
+
+## 脚本列表
+
+### 1. sync-shared-core.js - 共享代码同步工具
 
 自动将 `shared_core` 中的文件同步到各个项目目录。
+
+**使用方法：**
+
+```bash
+# 一次性同步
+npm run sync
+
+# 强制同步所有文件
+npm run sync:force
+
+# 监听模式（开发推荐）
+npm run sync:watch
+```
+
+详细说明请查看同步规则部分。
+
+### 2. generate-b30r10-image.js - B30/R10图片生成器
+
+将从Chrome扩展导出的JSON数据生成为精美的成绩图片。
+
+**使用方法：**
+
+```bash
+# 首次使用安装依赖
+npm install
+
+# 生成图片
+npm run generate-image <JSON文件路径>
+
+# 或直接运行
+node scripts/generate-b30r10-image.js <JSON文件路径>
+```
+
+**示例：**
+
+```bash
+npm run generate-image ./arcaea-b30r10-2024-12-01.json
+```
+
+**输出：**
+- 2400x3600像素的PNG图片
+- 8行5列的歌曲卡片布局
+- 包含玩家信息、分数、定数、PTT等完整数据
+
+详细说明请查看 [IMAGE_GENERATOR_README.md](../IMAGE_GENERATOR_README.md)
+
+---
 
 ## 安装依赖
 
@@ -8,43 +61,9 @@
 npm install
 ```
 
-## 使用方法
+## Shared Core 同步工具详细说明
 
-### 1. 一次性同步
-
-同步所有文件（仅同步已修改的文件）：
-
-```bash
-npm run sync
-```
-
-### 2. 强制同步
-
-强制同步所有文件（忽略修改时间）：
-
-```bash
-npm run sync:force
-```
-
-### 3. 监听模式
-
-自动监听文件变化并实时同步：
-
-```bash
-npm run sync:watch
-```
-
-在监听模式下，修改 `shared_core` 中的任何文件都会自动同步到目标目录。
-
-### 4. 查看配置
-
-查看当前的同步配置：
-
-```bash
-node scripts/sync-shared-core.js --config
-```
-
-## 同步规则
+### 同步规则
 
 ### JavaScript 文件
 

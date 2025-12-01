@@ -150,6 +150,11 @@
         processedElements = new WeakSet();
         processAllCards();
       }, 100);
+    } else if (message.type === 'EXPORT_DATA') {
+      console.log('[Arcaea Helper] 收到导出数据请求');
+      const exportData = collectExportData();
+      sendResponse({ success: true, data: exportData });
+      return true; // 保持消息通道开启以支持异步响应
     }
   });
 
@@ -695,6 +700,145 @@
       });
     } catch (error) {
       console.error('[Arcaea Helper] 添加目标分数失败:', error);
+    }
+  }
+
+  function collectExportData() {
+    try {
+      // 收集玩家信息
+      const usernameElement = document.querySelector('.username, [class*="username"]');
+      const username = usernameElement ? usernameElement.textContent.trim() : 'Unknown Player';
+      
+      // 获取PTT信息
+      const pttElement = document.querySelector('.arcaea-total-ptt');
+      let totalPTT = null;
+      let best30Avg = null;
+      let recent10Avg = null;
+      
+      if (pttElement) {
+        const pttText = pttElement.textContent;
+        const pttMatch = pttText.match(/PTT:\s*([\d.]+)\s*\|\s*B30:\s*([\d.]+)\s*\|\s*R10:\s*([\d.]+)/);
+        if (pttMatch) {
+          totalPTT = parseFloat(pttMatch[1]);
+          best30Avg = parseFloat(pttMatch[2]);
+          recent10Avg = parseFloat(pttMatch[3]);
+        }
+      }
+      
+      // 收集所有卡片数据
+      const best30Cards = [];
+      const recent10Cards = [];
+      
+      const cardLists = document.querySelectorAll('.card-list, [class*="card-list"]');
+      
+      cardLists.forEach((cardList) => {
+        const allCards = cardList.querySelectorAll('[data-v-b3942f14].card, div[data-v-b3942f14].card');
+        
+        allCards.forEach((card, index) => {
+          // 跳过 PTT 增长卡片（.arcaea-ptt-increase-card）
+          if (card.classList.contains('arcaea-ptt-increase-card')) {
+            return;
+          }
+          
+          const cardData = extractCardData(card);
+          if (cardData) {
+            // 重新计算实际的卡片索引（不包括特殊卡片）
+            const actualIndex = best30Cards.length + recent10Cards.length;
+            
+            if (actualIndex < 30) {
+              best30Cards.push({ ...cardData, rank: actualIndex + 1 });
+            } else if (actualIndex < 40) {
+              recent10Cards.push({ ...cardData, rank: actualIndex - 29 });
+            }
+          }
+        });
+      });
+      
+      return {
+        player: {
+          username,
+          totalPTT,
+          best30Avg,
+          recent10Avg,
+          exportDate: new Date().toISOString()
+        },
+        best30: best30Cards,
+        recent10: recent10Cards
+      };
+    } catch (error) {
+      console.error('[Arcaea Helper] 收集导出数据失败:', error);
+      return null;
+    }
+  }
+
+  function extractCardData(cardElement) {
+    try {
+      // 获取歌曲信息
+      const { title: songTitle, score } = getSongTitleAndScoreFromCard(cardElement);
+      if (!songTitle) return null;
+      
+      // 获取难度
+      const difficulty = getDifficultyFromElement(cardElement);
+      if (difficulty === null) return null;
+      
+      const difficultyNames = ['PST', 'PRS', 'FTR', 'BYD', 'ETR'];
+      const difficultyName = difficultyNames[difficulty] || 'UNKNOWN';
+      
+      // 获取定数
+      const constant = dataLoader.getChartConstant(songTitle, difficulty, false);
+      
+      // 获取PTT
+      const pttElement = cardElement.querySelector('.arcaea-play-ptt');
+      let playPTT = null;
+      if (pttElement) {
+        const pttText = pttElement.textContent.trim();
+        playPTT = parseFloat(pttText);
+      }
+      
+      // 获取曲绘URL - 查找实际的封面图片
+      let coverUrl = null;
+      
+      // 首先查找所有元素的背景图片（优先，因为曲绘通常作为背景）
+      const allElements = cardElement.querySelectorAll('*');
+      for (const el of allElements) {
+        const bgStyle = window.getComputedStyle(el).backgroundImage;
+        if (bgStyle && bgStyle !== 'none') {
+          const urlMatch = bgStyle.match(/url\(["']?([^"']+)["']?\)/);
+          if (urlMatch && urlMatch[1] && 
+              !urlMatch[1].startsWith('data:image/svg') && 
+              (urlMatch[1].includes('.jpg') || urlMatch[1].includes('.png') || 
+               urlMatch[1].includes('.webp') || urlMatch[1].includes('img'))) {
+            coverUrl = urlMatch[1];
+            break;
+          }
+        }
+      }
+      
+      // 如果还是没找到，尝试img标签
+      if (!coverUrl) {
+        const imgs = cardElement.querySelectorAll('img');
+        for (const img of imgs) {
+          if (img.src && !img.src.startsWith('data:image/svg') && 
+              (img.src.includes('.jpg') || img.src.includes('.png') || 
+               img.src.includes('.webp') || img.src.includes('img'))) {
+            coverUrl = img.src;
+            break;
+          }
+        }
+      }
+      
+      return {
+        songTitle,
+        difficulty: difficultyName,
+        difficultyIndex: difficulty,
+        score,
+        constant,
+        playPTT,
+        coverUrl
+      };
+    } catch (error) {
+      console.error('[Arcaea Helper] 提取卡片数据失败:', error);
+      return null;
     }
   }
 

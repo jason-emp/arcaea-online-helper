@@ -3,7 +3,7 @@
   "name": "Arcaea Online Helper",
   "version": "1.0",
   "description": "增强 Arcaea Online 查分页面：显示谱面定数、单曲PTT、推分目标、计算总PTT等功能",
-  "permissions": ["storage"],
+  "permissions": ["storage", "downloads", "tabs"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

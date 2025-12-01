@@ -45,14 +45,17 @@ async function saveSettings() {
     showStatusMessage('✓ 设置已保存');
     
     // 通知所有标签页更新设置
-    chrome.tabs.query({ url: 'https://arcaea.lowiro.com/*/profile/potential*' }, (tabs) => {
-      tabs.forEach(tab => {
-        chrome.tabs.sendMessage(tab.id, {
-          type: 'SETTINGS_UPDATED',
-          settings: settings
-        }).catch(() => {
-          // 忽略错误（页面可能未加载脚本）
-        });
+    const allTabs = await chrome.tabs.query({ url: 'https://arcaea.lowiro.com/*/*' });
+    const arcaeaTabs = allTabs.filter(tab => 
+      tab.url && tab.url.includes('/profile/potential')
+    );
+    
+    arcaeaTabs.forEach(tab => {
+      chrome.tabs.sendMessage(tab.id, {
+        type: 'SETTINGS_UPDATED',
+        settings: settings
+      }).catch(() => {
+        // 忽略错误（页面可能未加载脚本）
       });
     });
   } catch (error) {
@@ -100,6 +103,68 @@ function checkForUpdates() {
   });
 }
 
+// 导出数据
+async function exportData() {
+  try {
+    // 查找Arcaea页面 - 使用更宽松的匹配，然后手动过滤
+    const tabs = await chrome.tabs.query({ 
+      url: 'https://arcaea.lowiro.com/*/*' 
+    });
+    
+    // 手动过滤出 profile/potential 页面
+    const arcaeaTabs = tabs.filter(tab => 
+      tab.url && tab.url.includes('/profile/potential')
+    );
+    
+    if (arcaeaTabs.length === 0) {
+      showStatusMessage('✗ 请先打开Arcaea查分页面', 'error');
+      return;
+    }
+    
+    const tab = arcaeaTabs[0];
+    
+    // 向content script发送消息请求数据
+    chrome.tabs.sendMessage(tab.id, { type: 'EXPORT_DATA' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('[Arcaea Helper Settings] 导出失败:', chrome.runtime.lastError);
+        showStatusMessage('✗ 导出失败，请刷新页面重试', 'error');
+        return;
+      }
+      
+      if (!response || !response.success || !response.data) {
+        showStatusMessage('✗ 无法获取数据', 'error');
+        return;
+      }
+      
+      // 下载JSON文件
+      const dataStr = JSON.stringify(response.data, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = `arcaea-b30r10-${timestamp}.json`;
+      
+      chrome.downloads.download({
+        url: url,
+        filename: filename,
+        saveAs: true
+      }, (downloadId) => {
+        if (chrome.runtime.lastError) {
+          console.error('[Arcaea Helper Settings] 下载失败:', chrome.runtime.lastError);
+          showStatusMessage('✗ 下载失败', 'error');
+        } else {
+          console.log('[Arcaea Helper Settings] 数据已导出:', downloadId);
+          showStatusMessage('✓ 数据已导出');
+          URL.revokeObjectURL(url);
+        }
+      });
+    });
+  } catch (error) {
+    console.error('[Arcaea Helper Settings] 导出数据错误:', error);
+    showStatusMessage('✗ 导出失败', 'error');
+  }
+}
+
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
   // 加载设置
@@ -120,6 +185,9 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // 监听检查更新按钮
   document.getElementById('checkUpdateButton').addEventListener('click', checkForUpdates);
+  
+  // 监听导出数据按钮
+  document.getElementById('exportDataButton').addEventListener('click', exportData);
   
   console.log('[Arcaea Helper Settings] 设置页面已初始化');
 });
