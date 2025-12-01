@@ -40,3 +40,11 @@ flutter:
     - web/css/arcaea-styles.css
     - assets/data/ChartConstant.json
     - assets/data/Songlist.json
+  
+  fonts:
+    - family: Fira Sans
+      fonts:
+        - asset: assets/fonts/FiraSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/FiraSans-Bold.ttf
+          weight: 700

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -87,6 +88,10 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   String? _cachedChartConstant;
   String? _cachedSonglist;
 
+  // 用于处理页面刷新时的临时跳转
+  DateTime? _lastTargetPageTime;
+  Timer? _targetPageGraceTimer;
+
   // 图片生成状态
   bool _isGeneratingImage = false;
   String _generationProgress = '';
@@ -102,6 +107,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   @override
   void dispose() {
     _stopAggressiveLoop();
+    _targetPageGraceTimer?.cancel();
     super.dispose();
   }
 
@@ -275,36 +281,90 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
                 // 添加导出B30/R10数据的处理器
                 controller.addJavaScriptHandler(
                   handlerName: 'exportB30R10Data',
-                  callback: (args) async {
+                  callback: (args) {
                     debugPrint('[Arcaea Helper] 接收到B30/R10数据');
-                    try {
-                      final jsonData = args[0] as Map<String, dynamic>;
-                      _cachedB30R10Data = B30R10Data.fromJson(jsonData);
-                      debugPrint('[Arcaea Helper] 数据已缓存: ${_cachedB30R10Data!.player.username}');
-                      
-                      // 显示提示
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('数据已准备: ${_cachedB30R10Data!.player.username}'),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
+                    
+                    // 使用scheduleMicrotask在主isolate中异步处理
+                    scheduleMicrotask(() {
+                      try {
+                        // 数据可能是JSON字符串(iOS)或Map(Android)
+                        Map<String, dynamic> jsonData;
+                        
+                        if (args[0] is String) {
+                          // iOS: 解析JSON字符串
+                          debugPrint('[Arcaea Helper] iOS: 解析JSON字符串');
+                          final jsonString = args[0] as String;
+                          jsonData = jsonDecode(jsonString) as Map<String, dynamic>;
+                        } else if (args[0] is Map) {
+                          // Android: 直接使用Map
+                          debugPrint('[Arcaea Helper] Android: 使用Map对象');
+                          jsonData = args[0] as Map<String, dynamic>;
+                        } else {
+                          debugPrint('[Arcaea Helper] 未知数据类型: ${args[0].runtimeType}');
+                          return;
+                        }
+                        
+                        _cachedB30R10Data = B30R10Data.fromJson(jsonData);
+                        debugPrint('[Arcaea Helper] 数据已缓存: ${_cachedB30R10Data!.player.username}');
+                        
+                        // 使用WidgetsBinding确保在主线程显示SnackBar
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('数据已准备: ${_cachedB30R10Data!.player.username}'),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        });
+                      } catch (e, stackTrace) {
+                        debugPrint('[Arcaea Helper] 解析数据失败: $e');
+                        debugPrint('[Arcaea Helper] 堆栈: $stackTrace');
                       }
-                      
-                      return {'success': true};
-                    } catch (e) {
-                      debugPrint('[Arcaea Helper] 解析数据失败: $e');
-                      return {'success': false, 'error': e.toString()};
-                    }
+                    });
+                    
+                    // 立即返回null，不等待异步操作
+                    return null;
                   },
                 );
               },
               onLoadStart: (controller, url) {
                 debugPrint('[WebView] 开始加载: $url');
-                _resetInjectionState();
                 final rawUrl = url?.toString();
-                _isTargetPage = _isTargetUrl(rawUrl);
+                final wasTargetPage = _isTargetPage;
+                final isTarget = _isTargetUrl(rawUrl);
+                
+                // 如果是目标页面的加载开始,立即重置注入状态以确保刷新后能重新注入
+                if (isTarget) {
+                  debugPrint('[Arcaea Helper] 检测到目标页面开始加载，重置注入状态');
+                  _hasInjectedScript = false;
+                  _hasTriggeredProcessing = false;
+                  _aggressiveAttempts = 0;
+                  _stopAggressiveLoop();
+                  _targetPageGraceTimer?.cancel();
+                  _isTargetPage = true;
+                }
+                // 如果从目标页离开,设置宽限期
+                else if (wasTargetPage && !isTarget) {
+                  debugPrint('[Arcaea Helper] 检测到离开目标页面，设置3秒宽限期');
+                  _lastTargetPageTime = DateTime.now();
+                  _targetPageGraceTimer?.cancel();
+                  _targetPageGraceTimer = Timer(const Duration(seconds: 3), () {
+                    // 3秒后如果还没回到目标页面，才真正重置
+                    if (!_isTargetPage && mounted) {
+                      debugPrint('[Arcaea Helper] 宽限期结束，确认离开目标页面');
+                      _resetInjectionState();
+                    }
+                  });
+                  _isTargetPage = false;
+                } else if (!wasTargetPage && isTarget) {
+                  // 从非目标页回到目标页，取消宽限期
+                  _targetPageGraceTimer?.cancel();
+                  debugPrint('[Arcaea Helper] 回到目标页面，取消宽限期');
+                  _isTargetPage = true;
+                }
+                
                 debugPrint('[Arcaea Helper] URL检测: isTarget=$_isTargetPage, url=$rawUrl');
                 setState(() {
                   currentUrl = rawUrl ?? '';
@@ -315,6 +375,93 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
                 setState(() {
                   this.progress = progress / 100;
                 });
+              },
+              onUpdateVisitedHistory: (controller, url, isReload) async {
+                final urlString = url?.toString() ?? '';
+                final isTarget = _isTargetUrl(urlString);
+                
+                debugPrint('[WebView] onUpdateVisitedHistory - url=$urlString, isReload=$isReload, isTarget=$isTarget');
+                
+                // 如果是刷新操作且是目标页面,强制重新注入
+                if (isReload == true && isTarget) {
+                  debugPrint('[Arcaea Helper] 检测到页面刷新,强制重置并重新注入');
+                  _hasInjectedScript = false;
+                  _hasTriggeredProcessing = false;
+                  _aggressiveAttempts = 0;
+                  _stopAggressiveLoop();
+                  _targetPageGraceTimer?.cancel();
+                  _isTargetPage = true;
+                  _lastTargetPageTime = null;
+                  
+                  setState(() {
+                    currentUrl = urlString;
+                  });
+                  
+                  // 等待DOM加载
+                  await Future.delayed(const Duration(milliseconds: 1000));
+                  
+                  // 检查DOM是否已就绪
+                  final domReady = await _checkDOMReady(controller);
+                  debugPrint('[Arcaea Helper] onUpdateVisitedHistory(刷新) - DOM就绪状态: $domReady');
+                  
+                  if (!domReady) {
+                    debugPrint('[Arcaea Helper] onUpdateVisitedHistory(刷新) - DOM未就绪，再等待500ms');
+                    await Future.delayed(const Duration(milliseconds: 500));
+                  }
+                  
+                  debugPrint('[Arcaea Helper] onUpdateVisitedHistory(刷新) - 开始启动激进注入循环');
+                  _startAggressiveInjectionLoop(controller, reason: 'reload', forceRestart: true);
+                  return;
+                }
+                
+                // 如果URL变成了目标页面(非刷新场景)
+                if (isTarget) {
+                  // 取消之前的宽限期定时器
+                  _targetPageGraceTimer?.cancel();
+                  
+                  final now = DateTime.now();
+                  final isQuickReturn = _lastTargetPageTime != null && 
+                                       now.difference(_lastTargetPageTime!) < const Duration(seconds: 3);
+                  
+                  if (!_isTargetPage || isQuickReturn) {
+                    debugPrint('[Arcaea Helper] onUpdateVisitedHistory 检测到URL变为目标页面，准备注入 (快速返回: $isQuickReturn)');
+                    _isTargetPage = true;
+                    setState(() {
+                      currentUrl = urlString;
+                    });
+                    
+                    // 如果是快速返回(可能是刷新后的登录跳转),重置注入状态
+                    if (isQuickReturn) {
+                      debugPrint('[Arcaea Helper] 快速返回场景,重置注入状态');
+                      _hasInjectedScript = false;
+                      _hasTriggeredProcessing = false;
+                      _aggressiveAttempts = 0;
+                      _stopAggressiveLoop();
+                    }
+                    
+                    // 等待DOM加载
+                    await Future.delayed(const Duration(milliseconds: 1000));
+                    
+                    // 检查DOM是否已就绪
+                    final domReady = await _checkDOMReady(controller);
+                    debugPrint('[Arcaea Helper] onUpdateVisitedHistory - DOM就绪状态: $domReady');
+                    
+                    if (!domReady) {
+                      debugPrint('[Arcaea Helper] onUpdateVisitedHistory - DOM未就绪，再等待500ms');
+                      await Future.delayed(const Duration(milliseconds: 500));
+                    }
+                    
+                    debugPrint('[Arcaea Helper] onUpdateVisitedHistory - 开始启动激进注入循环');
+                    _startAggressiveInjectionLoop(controller, reason: 'updateVisitedHistory', forceRestart: true);
+                  }
+                } else if (!isTarget && _isTargetPage) {
+                  // 离开目标页面，但不立即停止，给予宽限期
+                  debugPrint('[Arcaea Helper] onUpdateVisitedHistory 检测到离开目标页面，等待宽限期');
+                  _lastTargetPageTime = DateTime.now();
+                  
+                  // 不立即设置 _isTargetPage = false，让宽限期定时器处理
+                  // 注意:不在这里重置 _isTargetPage,以避免中断正在进行的注入
+                }
               },
               onLoadStop: (controller, url) async {
                 final urlString = url?.toString() ?? '';
@@ -567,23 +714,37 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     try {
       debugPrint('[Arcaea Helper] 开始获取B30/R10数据...');
       
+      // iOS崩溃的根本原因：callHandler返回值处理
+      // 解决方案：使用setTimeout延迟执行，不处理返回值
       await webViewController!.evaluateJavascript(source: '''
-        (async function() {
-          if (typeof window.exportB30R10Data === 'function') {
-            const data = await window.exportB30R10Data();
-            if (data) {
-              window.flutter_inappwebview.callHandler('exportB30R10Data', data);
-              console.log('[Arcaea Helper] 数据已发送到Flutter');
-            } else {
-              console.error('[Arcaea Helper] 数据导出失败');
+        (function() {
+          setTimeout(async function() {
+            try {
+              if (typeof window.exportB30R10Data === 'function') {
+                const data = await window.exportB30R10Data();
+                if (data) {
+                  // 发送数据，但不等待返回值，也不处理promise
+                  try {
+                    window.flutter_inappwebview.callHandler('exportB30R10Data', data);
+                    console.log('[Arcaea Helper] 数据已发送到Flutter');
+                  } catch (e) {
+                    console.error('[Arcaea Helper] 调用handler失败:', e);
+                  }
+                } else {
+                  console.error('[Arcaea Helper] 数据导出为空');
+                }
+              } else {
+                console.error('[Arcaea Helper] exportB30R10Data 函数不存在');
+              }
+            } catch (error) {
+              console.error('[Arcaea Helper] 导出过程出错:', error);
             }
-          } else {
-            console.error('[Arcaea Helper] exportB30R10Data 函数不存在');
-          }
+          }, 100);
         })();
       ''');
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('[Arcaea Helper] 获取数据失败: $e');
+      debugPrint('[Arcaea Helper] 堆栈: $stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('获取数据失败: $e')),
@@ -700,6 +861,8 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     _isTargetPage = false;
     _aggressiveAttempts = 0;
     _isPerformingAggressiveCycle = false;
+    _lastTargetPageTime = null;
+    _targetPageGraceTimer?.cancel();
     _stopAggressiveLoop();
   }
 

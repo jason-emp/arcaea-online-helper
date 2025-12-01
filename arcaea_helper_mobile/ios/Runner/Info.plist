@@ -50,6 +50,10 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>保存生成的 B30/R10 成绩图片到相册</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>保存生成的 B30/R10 成绩图片到相册</string>
 	<key>io.flutter.embedded_views_preview</key>
 	<true/>
 </dict>

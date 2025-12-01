@@ -189,7 +189,7 @@ class ImageGeneratorService {
         color: ImageGeneratorConfig.textPrimary,
         fontSize: ImageGeneratorConfig.playerName,
         fontWeight: FontWeight.bold,
-        fontFamily: 'monospace', // 使用等宽字体提升可读性
+        fontFamily: 'Fira Sans',
       ),
     );
     textPainter.layout();
@@ -214,6 +214,7 @@ class ImageGeneratorService {
           color: ImageGeneratorConfig.scoreGold,
           fontSize: ImageGeneratorConfig.playerStats,
           fontWeight: FontWeight.bold,
+          fontFamily: 'Fira Sans',
         ),
       );
       textPainter.layout();
@@ -234,6 +235,7 @@ class ImageGeneratorService {
           color: ImageGeneratorConfig.textPrimary,
           fontSize: ImageGeneratorConfig.playerStats,
           fontWeight: FontWeight.bold,
+          fontFamily: 'Fira Sans',
         ),
       );
       textPainter.layout();
@@ -254,6 +256,7 @@ class ImageGeneratorService {
           color: ImageGeneratorConfig.textPrimary,
           fontSize: ImageGeneratorConfig.playerStats,
           fontWeight: FontWeight.bold,
+          fontFamily: 'Fira Sans',
         ),
       );
       textPainter.layout();
@@ -274,6 +277,7 @@ class ImageGeneratorService {
       style: const TextStyle(
         color: ImageGeneratorConfig.textTertiary,
         fontSize: ImageGeneratorConfig.playerStatsLabel,
+        fontFamily: 'Fira Sans',
       ),
     );
     textPainter.layout();
@@ -353,6 +357,7 @@ class ImageGeneratorService {
             : ImageGeneratorConfig.scoreGold,
         fontSize: ImageGeneratorConfig.cardRank,
         fontWeight: FontWeight.bold,
+        fontFamily: 'Fira Sans',
       ),
     );
     textPainter.layout();
@@ -367,6 +372,7 @@ class ImageGeneratorService {
         color: Colors.white,
         fontSize: ImageGeneratorConfig.cardDifficulty,
         fontWeight: FontWeight.bold,
+        fontFamily: 'Fira Sans',
       ),
     );
     textPainter.layout();
@@ -399,6 +405,7 @@ class ImageGeneratorService {
         color: ImageGeneratorConfig.textPrimary,
         fontSize: ImageGeneratorConfig.cardTitle,
         fontWeight: FontWeight.bold,
+        fontFamily: 'Fira Sans',
       ),
     );
     textPainter.layout(maxWidth: maxTitleWidth);
@@ -418,43 +425,51 @@ class ImageGeneratorService {
         color: ImageGeneratorConfig.scoreGold,
         fontSize: ImageGeneratorConfig.cardScore,
         fontWeight: FontWeight.bold,
+        fontFamily: 'Fira Sans',
       ),
     );
     textPainter.layout();
     final scoreY = titleEndY + 55;
     textPainter.paint(canvas, Offset(x + 15, scoreY));
 
-    // 评级（在分数右侧）
+    // 评级（在分数右侧，基线对齐）
     final grade = getScoreGrade(cardData.score);
     final scoreWidth = textPainter.width;
+    final scoreHeight = textPainter.height; // 保存分数的高度用于计算基线
     textPainter.text = TextSpan(
       text: grade,
       style: const TextStyle(
         color: Colors.white,
         fontSize: ImageGeneratorConfig.cardInfo,
         fontWeight: FontWeight.bold,
+        fontFamily: 'Fira Sans',
       ),
     );
     textPainter.layout();
-    textPainter.paint(canvas, Offset(x + 15 + scoreWidth + 25, scoreY));
+    // 计算基线偏移：让评级与分数底部对齐
+    final gradeBaselineOffset = scoreHeight - textPainter.height;
+    textPainter.paint(canvas, Offset(x + 15 + scoreWidth + 25, scoreY + gradeBaselineOffset));
 
-    // 定数和PTT信息（同一行，左右对齐）
+    // 定数和PTT信息（同一行，左右对齐，基线对齐）
     final infoY = scoreY + 55;
 
     // 定数（左对齐）
+    double constantHeight = 0;
     if (cardData.constant != null) {
       textPainter.text = TextSpan(
         text: '定数: ${cardData.constant!.toStringAsFixed(1)}',
         style: const TextStyle(
           color: ImageGeneratorConfig.textSecondary,
           fontSize: ImageGeneratorConfig.cardInfo,
+          fontFamily: 'Fira Sans',
         ),
       );
       textPainter.layout();
+      constantHeight = textPainter.height; // 保存定数的高度
       textPainter.paint(canvas, Offset(x + 15, infoY));
     }
 
-    // PTT（右对齐，浅蓝色加粗）
+    // PTT（右对齐，浅蓝色加粗，与定数基线对齐）
     if (cardData.playPTT != null) {
       textPainter.text = TextSpan(
         text: 'PTT: ${cardData.playPTT!.toStringAsFixed(4)}',
@@ -462,14 +477,17 @@ class ImageGeneratorService {
           color: ImageGeneratorConfig.pttBlue,
           fontSize: ImageGeneratorConfig.cardInfo,
           fontWeight: FontWeight.bold,
+          fontFamily: 'Fira Sans',
         ),
       );
       textPainter.layout();
+      // 如果定数存在，计算基线偏移以对齐
+      final pttBaselineOffset = constantHeight > 0 ? constantHeight - textPainter.height : 0;
       textPainter.paint(
         canvas,
         Offset(
           x + ImageGeneratorConfig.cardWidth - 15 - textPainter.width,
-          infoY,
+          infoY + pttBaselineOffset,
         ),
       );
     }
@@ -486,6 +504,7 @@ class ImageGeneratorService {
           color: ImageGeneratorConfig.targetScore,
           fontSize: ImageGeneratorConfig.cardTarget,
           fontWeight: FontWeight.bold,
+          fontFamily: 'Fira Sans',
         ),
       );
       textPainter.layout();
@@ -698,6 +717,7 @@ class ImageGeneratorService {
       style: TextStyle(
         color: ImageGeneratorConfig.textTertiary,
         fontSize: ImageGeneratorConfig.footer,
+        fontFamily: 'Fira Sans',
       ),
     );
     textPainter.layout();

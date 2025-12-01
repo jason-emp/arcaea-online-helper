@@ -648,26 +648,61 @@
   };
   
   // MutationObserver - 延迟启动，只在首次处理完成后
+  let mutationTimeout = null;
   function startMutationObserver() {
     const observer = new MutationObserver((mutations) => {
       if (isProcessing) return;
       
+      // 检查是否是有意义的DOM变化（排除我们自己添加的元素）
       let shouldProcess = false;
       for (const mutation of mutations) {
         if (mutation.addedNodes.length > 0) {
-          shouldProcess = true;
-          break;
+          // 检查新增的节点是否是卡片而不是我们添加的辅助元素
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              // 跳过我们自己添加的元素
+              if (node.classList && (
+                node.classList.contains('arcaea-chart-info') ||
+                node.classList.contains('arcaea-target-score') ||
+                node.classList.contains('arcaea-card-index') ||
+                node.classList.contains('arcaea-total-ptt') ||
+                node.classList.contains('arcaea-ptt-increase-card') ||
+                node.classList.contains('arcaea-section-divider') ||
+                node.classList.contains('arcaea-b30r10-info')
+              )) {
+                continue;
+              }
+              
+              // 如果是卡片容器或卡片列表，才触发重新处理
+              if (node.classList && (
+                node.classList.contains('card') ||
+                node.classList.contains('card-list') ||
+                node.querySelector && node.querySelector('[data-v-b3942f14].card')
+              )) {
+                shouldProcess = true;
+                break;
+              }
+            }
+          }
+          if (shouldProcess) break;
         }
       }
+      
       if (shouldProcess) {
-        console.log('[Arcaea Helper] 检测到DOM变化，500ms后重新处理');
-        setTimeout(() => {
+        // 防抖：清除之前的定时器，避免频繁触发
+        if (mutationTimeout) {
+          clearTimeout(mutationTimeout);
+        }
+        
+        mutationTimeout = setTimeout(() => {
           if (!isProcessing) {
+            console.log('[Arcaea Helper] 检测到有效DOM变化，重新处理');
             isProcessing = true;
             processAllCards();
             isProcessing = false;
           }
-        }, 500);
+          mutationTimeout = null;
+        }, 1000); // 增加延迟到1秒，减少频繁触发
       }
     });
 
@@ -847,7 +882,8 @@
         totalPTT: totalPTT
       });
 
-      return exportData;
+      // iOS WebView不支持返回大型对象，改为返回JSON字符串
+      return JSON.stringify(exportData);
     } catch (error) {
       console.error('[Arcaea Helper] ❌ 导出数据失败:', error);
       return null;
