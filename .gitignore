@@ -10,6 +10,7 @@ package-lock.json
 .idea/
 *.iml
 .copilot/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -18,3 +19,8 @@ Thumbs.db
 build/
 dist/
 *.log
+
+# Sync tool
+.sync-cache.json
+.sync-logs/
+.sync-backups/

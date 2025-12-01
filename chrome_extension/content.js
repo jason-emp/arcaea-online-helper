@@ -425,6 +425,35 @@
     }
   }
 
+  // 在 PTT 增长卡片的表格下方添加 B30/R10 信息
+  function addB30R10InfoToFirstCard(best30Avg, recent10Avg) {
+    try {
+      const pttIncreaseCard = document.querySelector('.arcaea-ptt-increase-card');
+      if (!pttIncreaseCard) return;
+      
+      // 移除已存在的信息
+      const existing = pttIncreaseCard.querySelector('.arcaea-b30r10-info');
+      if (existing) existing.remove();
+      
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'arcaea-b30r10-info';
+      infoDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-around; padding: 8px 12px; margin-top: 12px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(234, 88, 12, 0.1) 100%); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.3);">
+          <span style="font-size: 13px; font-weight: 600; color: #333;">B30: ${best30Avg.toFixed(4)}</span>
+          <span style="font-size: 13px; font-weight: 600; color: #333;">R10: ${recent10Avg.toFixed(4)}</span>
+        </div>
+      `;
+      
+      // 找到 PTT 增长卡片内部的内容容器
+      const cardInner = pttIncreaseCard.querySelector('[data-v-b3942f14].card');
+      if (cardInner) {
+        cardInner.appendChild(infoDiv);
+      }
+    } catch (error) {
+      console.error('[Arcaea Helper] 添加B30/R10信息失败:', error);
+    }
+  }
+
   function displayTotalPTT(totalPTT, best30PTTs, recent10PTTs) {
     try {
       if (document.querySelector('.arcaea-total-ptt')) {
@@ -436,17 +465,10 @@
 
       const usernameElement = usernameElements[0];
       
-      // 计算B30和R10平均值
-      const best30Avg = best30PTTs.length > 0 
-        ? best30PTTs.reduce((sum, ptt) => sum + ptt, 0) / best30PTTs.length 
-        : 0;
-      const recent10Avg = recent10PTTs.length > 0 
-        ? recent10PTTs.reduce((sum, ptt) => sum + ptt, 0) / recent10PTTs.length 
-        : 0;
-      
+      // 昵称框只显示精确的PTT值
       const pttSpan = document.createElement('span');
       pttSpan.className = 'arcaea-total-ptt';
-      pttSpan.textContent = ` (PTT: ${totalPTT.toFixed(4)} | B30: ${best30Avg.toFixed(4)} | R10: ${recent10Avg.toFixed(4)})`;
+      pttSpan.textContent = ` (${totalPTT.toFixed(4)})`;
       pttSpan.style.color = '#667eea';
       pttSpan.style.fontSize = '0.9em';
       pttSpan.style.fontWeight = '700';
@@ -665,10 +687,22 @@
         const recent10Sum = recent10PTTs.reduce((sum, ptt) => sum + ptt, 0);
         const totalPTT = (best30Sum + recent10Sum) / 40;
         
+        // 计算B30和R10平均值
+        const best30Avg = best30PTTs.length > 0 
+          ? best30PTTs.reduce((sum, ptt) => sum + ptt, 0) / best30PTTs.length 
+          : 0;
+        const recent10Avg = recent10PTTs.length > 0 
+          ? recent10PTTs.reduce((sum, ptt) => sum + ptt, 0) / recent10PTTs.length 
+          : 0;
+        
         console.log(`[Arcaea Helper] 计算的总PTT: ${totalPTT.toFixed(4)}`);
         
         displayTotalPTT(totalPTT, best30PTTs, recent10PTTs);
         insertPTTIncreaseCard(totalPTT, best30PTTs, recent10PTTs);
+        
+        // 在PTT增长卡片插入后，添加B30/R10信息
+        addB30R10InfoToFirstCard(best30Avg, recent10Avg);
+        
         addTargetScoresToAllCards(totalPTT);
       }
     } catch (error) {
@@ -717,12 +751,20 @@
       
       if (pttElement) {
         const pttText = pttElement.textContent;
-        const pttMatch = pttText.match(/PTT:\s*([\d.]+)\s*\|\s*B30:\s*([\d.]+)\s*\|\s*R10:\s*([\d.]+)/);
+        // 新格式：只有精确PTT值
+        const pttMatch = pttText.match(/\(([\d.]+)\)/);
         if (pttMatch) {
           totalPTT = parseFloat(pttMatch[1]);
-          best30Avg = parseFloat(pttMatch[2]);
-          recent10Avg = parseFloat(pttMatch[3]);
         }
+      }
+      
+      // 从第一个卡片获取B30和R10信息
+      const b30r10Info = document.querySelector('.arcaea-b30r10-info');
+      if (b30r10Info) {
+        const b30Match = b30r10Info.textContent.match(/B30:\s*([\d.]+)/);
+        const r10Match = b30r10Info.textContent.match(/R10:\s*([\d.]+)/);
+        if (b30Match) best30Avg = parseFloat(b30Match[1]);
+        if (r10Match) recent10Avg = parseFloat(r10Match[1]);
       }
       
       // 收集所有卡片数据

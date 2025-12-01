@@ -3,17 +3,78 @@
 /**
  * Shared Core 同步工具
  * 自动将 shared_core 的文件同步到各个项目目录
+ * 
+ * 功能：
+ * - 基于内容哈希的智能同步（只在内容真正变化时同步）
+ * - 反向检测（警告误修改同步文件的情况）
+ * - 同步日志记录
+ * - 自动备份
  */
 
 import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createHash } from 'crypto';
 import chokidar from 'chokidar';
 import chalk from 'chalk';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, '..');
+const SYNC_LOG_DIR = path.join(ROOT_DIR, '.sync-logs');
+const HASH_CACHE_FILE = path.join(ROOT_DIR, '.sync-cache.json');
+
+/**
+ * 计算文件的 MD5 哈希
+ */
+async function getFileHash(filePath) {
+  try {
+    const content = await fs.readFile(filePath);
+    return createHash('md5').update(content).digest('hex');
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * 读取哈希缓存
+ */
+async function loadHashCache() {
+  try {
+    if (await fs.pathExists(HASH_CACHE_FILE)) {
+      return await fs.readJson(HASH_CACHE_FILE);
+    }
+  } catch (error) {
+    console.warn(chalk.yellow('⚠️  读取哈希缓存失败，将重新创建'));
+  }
+  return {};
+}
+
+/**
+ * 保存哈希缓存
+ */
+async function saveHashCache(cache) {
+  try {
+    await fs.writeJson(HASH_CACHE_FILE, cache, { spaces: 2 });
+  } catch (error) {
+    console.error(chalk.red('保存哈希缓存失败:'), error.message);
+  }
+}
+
+/**
+ * 记录同步日志
+ */
+async function logSync(action, sourceFile, targetFile, details = '') {
+  try {
+    await fs.ensureDir(SYNC_LOG_DIR);
+    const logFile = path.join(SYNC_LOG_DIR, `sync-${new Date().toISOString().split('T')[0]}.log`);
+    const timestamp = new Date().toISOString();
+    const logEntry = `[${timestamp}] ${action}: ${sourceFile} -> ${targetFile} ${details}\n`;
+    await fs.appendFile(logFile, logEntry);
+  } catch (error) {
+    // 日志失败不影响同步
+  }
+}
 
 // 配置同步规则
 const SYNC_CONFIG = {
@@ -70,9 +131,9 @@ const SYNC_CONFIG = {
 };
 
 /**
- * 同步单个文件
+ * 同步单个文件（基于内容哈希）
  */
-async function syncFile(sourceRelPath, targetRelPath, force = false) {
+async function syncFile(sourceRelPath, targetRelPath, force = false, hashCache = {}) {
   const sourcePath = path.join(ROOT_DIR, sourceRelPath);
   const targetPath = path.join(ROOT_DIR, targetRelPath);
 
@@ -80,17 +141,51 @@ async function syncFile(sourceRelPath, targetRelPath, force = false) {
     // 检查源文件是否存在
     if (!await fs.pathExists(sourcePath)) {
       console.log(chalk.yellow(`⚠️  源文件不存在: ${sourceRelPath}`));
-      return false;
+      await logSync('ERROR', sourceRelPath, targetRelPath, '源文件不存在');
+      return { synced: false, error: '源文件不存在' };
     }
 
-    // 检查目标文件是否需要更新
-    if (!force && await fs.pathExists(targetPath)) {
-      const sourceStats = await fs.stat(sourcePath);
-      const targetStats = await fs.stat(targetPath);
+    // 计算源文件哈希
+    const sourceHash = await getFileHash(sourcePath);
+    if (!sourceHash) {
+      console.log(chalk.yellow(`⚠️  无法读取源文件: ${sourceRelPath}`));
+      return { synced: false, error: '无法读取源文件' };
+    }
+
+    // 检查目标文件
+    const targetExists = await fs.pathExists(targetPath);
+    let shouldSync = force;
+
+    if (!shouldSync && targetExists) {
+      const targetHash = await getFileHash(targetPath);
       
-      if (sourceStats.mtime <= targetStats.mtime) {
-        // 源文件未更新，跳过
-        return false;
+      // 比较哈希值
+      if (sourceHash !== targetHash) {
+        // 检查是否是目标文件被误修改
+        const cachedTargetHash = hashCache[targetRelPath];
+        if (cachedTargetHash && cachedTargetHash !== targetHash && cachedTargetHash === sourceHash) {
+          console.log(chalk.red(`⚠️  警告: ${targetRelPath} 可能被直接修改！`));
+          console.log(chalk.yellow(`   应该在 ${sourceRelPath} 中修改，然后重新同步`));
+          await logSync('WARNING', sourceRelPath, targetRelPath, '目标文件被直接修改');
+        }
+        shouldSync = true;
+      }
+    } else if (!targetExists) {
+      shouldSync = true;
+    }
+
+    if (!shouldSync) {
+      return { synced: false, skipped: true };
+    }
+
+    // 备份现有文件（如果存在且不同）
+    if (targetExists) {
+      const targetHash = await getFileHash(targetPath);
+      if (targetHash !== sourceHash) {
+        const backupDir = path.join(ROOT_DIR, '.sync-backups', new Date().toISOString().split('T')[0]);
+        await fs.ensureDir(backupDir);
+        const backupPath = path.join(backupDir, path.basename(targetPath) + '.bak');
+        await fs.copy(targetPath, backupPath);
       }
     }
 
@@ -100,13 +195,20 @@ async function syncFile(sourceRelPath, targetRelPath, force = false) {
     // 复制文件
     await fs.copy(sourcePath, targetPath, { overwrite: true });
     
+    // 更新哈希缓存
+    hashCache[targetRelPath] = sourceHash;
+    hashCache[sourceRelPath] = sourceHash;
+    
     const relTarget = path.relative(ROOT_DIR, targetPath);
     console.log(chalk.green(`✓ 已同步: ${relTarget}`));
-    return true;
+    await logSync('SYNC', sourceRelPath, targetRelPath, `hash:${sourceHash.substring(0, 8)}`);
+    
+    return { synced: true, hash: sourceHash };
   } catch (error) {
     console.error(chalk.red(`✗ 同步失败: ${targetRelPath}`));
     console.error(chalk.red(`  错误: ${error.message}`));
-    return false;
+    await logSync('ERROR', sourceRelPath, targetRelPath, error.message);
+    return { synced: false, error: error.message };
   }
 }
 
@@ -116,25 +218,49 @@ async function syncFile(sourceRelPath, targetRelPath, force = false) {
 async function syncAll(force = false) {
   console.log(chalk.cyan('\n🔄 开始同步 shared_core...\n'));
   
+  // 加载哈希缓存
+  const hashCache = await loadHashCache();
+  
   let totalSynced = 0;
   let totalSkipped = 0;
+  let totalErrors = 0;
+  const warnings = [];
 
   for (const category of Object.values(SYNC_CONFIG)) {
     for (const rule of category) {
       const { source, targets } = rule;
       
       for (const target of targets) {
-        const synced = await syncFile(source, target, force);
-        if (synced) {
+        const result = await syncFile(source, target, force, hashCache);
+        if (result.synced) {
           totalSynced++;
+        } else if (result.error) {
+          totalErrors++;
         } else {
           totalSkipped++;
+        }
+        
+        if (result.warning) {
+          warnings.push(result.warning);
         }
       }
     }
   }
 
-  console.log(chalk.cyan(`\n✅ 同步完成! 已更新: ${totalSynced} 个文件, 跳过: ${totalSkipped} 个文件\n`));
+  // 保存哈希缓存
+  await saveHashCache(hashCache);
+
+  // 显示总结
+  console.log(chalk.cyan(`\n✅ 同步完成!`));
+  console.log(chalk.green(`   已同步: ${totalSynced} 个文件`));
+  console.log(chalk.gray(`   跳过: ${totalSkipped} 个文件`));
+  if (totalErrors > 0) {
+    console.log(chalk.red(`   错误: ${totalErrors} 个文件`));
+  }
+  if (warnings.length > 0) {
+    console.log(chalk.yellow(`\n⚠️  警告: 发现 ${warnings.length} 个潜在问题`));
+  }
+  console.log('');
 }
 
 /**
@@ -164,16 +290,22 @@ function watchAndSync() {
     const relPath = path.relative(ROOT_DIR, changedPath);
     console.log(chalk.yellow(`\n📝 检测到文件变化: ${relPath}`));
 
+    // 加载哈希缓存
+    const hashCache = await loadHashCache();
+
     // 找到对应的同步规则
     for (const category of Object.values(SYNC_CONFIG)) {
       for (const rule of category) {
         if (relPath === rule.source || relPath === rule.source.replace(/\//g, path.sep)) {
           for (const target of rule.targets) {
-            await syncFile(rule.source, target, true);
+            await syncFile(rule.source, target, true, hashCache);
           }
         }
       }
     }
+
+    // 保存哈希缓存
+    await saveHashCache(hashCache);
   });
 
   watcher.on('ready', () => {

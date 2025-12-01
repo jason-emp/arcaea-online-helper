@@ -77,8 +77,8 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   bool _aggressiveLoopActive = false;
   bool _isPerformingAggressiveCycle = false;
   int _aggressiveAttempts = 0;
-  static const int _maxAggressiveAttempts = 50;
-  static const Duration _aggressiveInterval = Duration(milliseconds: 400);
+  static const int _maxAggressiveAttempts = 150;  // 增加到150次
+  static const Duration _aggressiveInterval = Duration(milliseconds: 400);  // 增加到400ms
 
   String? _cachedCalculatorScript;
   String? _cachedDataLoaderScript;
@@ -305,6 +305,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
                 _resetInjectionState();
                 final rawUrl = url?.toString();
                 _isTargetPage = _isTargetUrl(rawUrl);
+                debugPrint('[Arcaea Helper] URL检测: isTarget=$_isTargetPage, url=$rawUrl');
                 setState(() {
                   currentUrl = rawUrl ?? '';
                   progress = 0;
@@ -316,16 +317,35 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
                 });
               },
               onLoadStop: (controller, url) async {
-                debugPrint('[WebView] 加载完成: $url');
+                final urlString = url?.toString() ?? '';
+                debugPrint('[WebView] 加载完成: $urlString');
                 setState(() {
                   progress = 1.0;
                 });
 
-                final isTarget = _isTargetUrl(url?.toString());
+                final isTarget = _isTargetUrl(urlString);
+                debugPrint('[Arcaea Helper] onLoadStop - isTarget=$isTarget, url=$urlString');
                 _isTargetPage = isTarget;
+                
                 if (isTarget) {
+                  debugPrint('[Arcaea Helper] 检测到目标页面，延迟800ms后开始注入');
+                  // 延迟更长时间以确保DOM完全加载和渲染
+                  await Future.delayed(const Duration(milliseconds: 800));
+                  
+                  // 检查DOM是否已就绪
+                  final domReady = await _checkDOMReady(controller);
+                  debugPrint('[Arcaea Helper] DOM就绪状态: $domReady');
+                  
+                  // 如果DOM未就绪，再等待一会儿
+                  if (!domReady) {
+                    debugPrint('[Arcaea Helper] DOM未就绪，再等待500ms');
+                    await Future.delayed(const Duration(milliseconds: 500));
+                  }
+                  
+                  debugPrint('[Arcaea Helper] 开始启动激进注入循环');
                   _startAggressiveInjectionLoop(controller, reason: 'loadStop', forceRestart: true);
                 } else {
+                  debugPrint('[Arcaea Helper] 非目标页面，停止注入循环');
                   _stopAggressiveLoop();
                 }
               },
@@ -795,7 +815,9 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
 
   Future<void> _injectArcaeaHelper(InAppWebViewController controller) async {
     try {
-      debugPrint('[Arcaea Helper] 开始注入脚本...');
+      debugPrint('[Arcaea Helper] ====== 开始注入脚本 ======');
+      debugPrint('[Arcaea Helper] 当前 URL: $currentUrl');
+      debugPrint('[Arcaea Helper] 是否目标页面: $_isTargetPage');
 
       // 加载核心模块
       await _ensureAssetsCached();
@@ -806,7 +828,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
       final chartConstant = _cachedChartConstant!;
       final songlist = _cachedSonglist!;
 
-      debugPrint('[Arcaea Helper] 资源加载完成');
+      debugPrint('[Arcaea Helper] 资源加载完成，开始注入...');
 
       // 1. 注入样式
       await controller.evaluateJavascript(source: '''
@@ -820,14 +842,15 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
           }
         })();
       ''');
+      debugPrint('[Arcaea Helper] ✅ 样式模块已注入');
 
       // 2. 注入核心计算模块
       await controller.evaluateJavascript(source: calculator);
-      debugPrint('[Arcaea Helper] 计算模块已注入');
+      debugPrint('[Arcaea Helper] ✅ 计算模块已注入');
 
       // 3. 注入数据加载模块
       await controller.evaluateJavascript(source: dataLoader);
-      debugPrint('[Arcaea Helper] 数据加载模块已注入');
+      debugPrint('[Arcaea Helper] ✅ 数据加载模块已注入');
 
       // 4. 初始化数据
       await controller.evaluateJavascript(source: '''
@@ -845,7 +868,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
           }
         })();
       ''');
-      debugPrint('[Arcaea Helper] 数据已初始化');
+      debugPrint('[Arcaea Helper] ✅ 数据已初始化');
 
       // 5. 设置配置
       await controller.evaluateJavascript(source: '''
@@ -857,10 +880,11 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
           showDownloadButtons: $showDownloadButtons,
         };
       ''');
+      debugPrint('[Arcaea Helper] ✅ 配置已设置');
 
       // 6. 注入主内容脚本
       await controller.evaluateJavascript(source: contentScript);
-      debugPrint('[Arcaea Helper] 内容脚本已注入');
+      debugPrint('[Arcaea Helper] ✅ 内容脚本已注入');
 
       // 7. 等待脚本初始化完成并主动触发页面处理
       bool triggeredViaReadyState = false;
@@ -922,24 +946,37 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
 
   Future<void> _ensureScriptTriggered(InAppWebViewController controller) async {
     if (_hasTriggeredProcessing) {
-      debugPrint('[Arcaea Helper] 已经触发过处理，跳过');
       return;
     }
     
     try {
       // 检查DOM是否有内容
-      final hasContent = await controller.evaluateJavascript(source: '''
+      final domCheck = await controller.evaluateJavascript(source: '''
         (function() {
           const cardLists = document.querySelectorAll('.card-list, [class*="card-list"]');
-          const hasCards = Array.from(cardLists).some(list => 
-            list.querySelectorAll('[data-v-b3942f14].card').length > 0
-          );
-          return hasCards;
+          let totalCards = 0;
+          cardLists.forEach(list => {
+            totalCards += list.querySelectorAll('[data-v-b3942f14].card').length;
+          });
+          return {
+            hasCardLists: cardLists.length > 0,
+            totalCards: totalCards,
+            hasCards: totalCards > 0
+          };
         })();
       ''');
       
-      if (hasContent != true) {
-        debugPrint('[Arcaea Helper] DOM内容尚未准备好');
+      if (domCheck is Map) {
+        final hasCards = domCheck['hasCards'] == true;
+        final totalCards = domCheck['totalCards'] ?? 0;
+        final hasCardLists = domCheck['hasCardLists'] == true;
+        
+        debugPrint('[Arcaea Helper] DOM检查: 卡片列表=$hasCardLists, 卡片数=$totalCards');
+        
+        if (!hasCards) {
+          return;
+        }
+      } else if (domCheck != true) {
         return;
       }
       
@@ -951,7 +988,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
       ''');
       
       if (isReady == true) {
-        debugPrint('[Arcaea Helper] ✅ 触发页面处理');
+        debugPrint('[Arcaea Helper] ✅ 触发页面处理 (尝试 $_aggressiveAttempts)');
         await controller.evaluateJavascript(source: '''
           (function() {
             console.log('[Arcaea Helper Flutter] 触发页面处理');
@@ -959,37 +996,82 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
           })();
         ''');
         _hasTriggeredProcessing = true;
-      } else {
-        debugPrint('[Arcaea Helper] 脚本尚未就绪');
       }
     } catch (e) {
       debugPrint('[Arcaea Helper] 确保触发失败: $e');
     }
   }
   
+  Future<bool> _checkDOMReady(InAppWebViewController controller) async {
+    try {
+      final result = await controller.evaluateJavascript(source: '''
+        (function() {
+          const cardLists = document.querySelectorAll('.card-list, [class*="card-list"]');
+          const hasCards = Array.from(cardLists).some(list => 
+            list.querySelectorAll('[data-v-b3942f14].card').length > 0
+          );
+          return hasCards;
+        })();
+      ''');
+      return result == true;
+    } catch (e) {
+      debugPrint('[Arcaea Helper] DOM就绪检查失败: $e');
+      return false;
+    }
+  }
+  
   void _startContinuousCheck(InAppWebViewController controller) {
-    // 为iOS启动持续检查机制
-    debugPrint('[Arcaea Helper] iOS: 启动持续检查机制');
+    // 为iOS启动持续检查机制（增强版）
+    debugPrint('[Arcaea Helper] iOS: 启动增强持续检查机制');
     
     void checkAndTrigger() async {
+      if (!mounted || !_isTargetPage) {
+        return;
+      }
+      
       if (!_hasInjectedScript) {
         debugPrint('[Arcaea Helper] iOS: 脚本尚未注入，等待...');
         return;
       }
       
       if (_hasTriggeredProcessing) {
-        debugPrint('[Arcaea Helper] iOS: 已触发处理，停止检查');
         return;
       }
       
-      await _ensureScriptTriggered(controller);
+      // 检查DOM内容
+      try {
+        final hasContent = await controller.evaluateJavascript(source: '''
+          (function() {
+            const hasBody = document.body && document.body.children.length > 0;
+            const hasCards = document.querySelectorAll('.card-list, [class*="card-list"]').length > 0;
+            return hasBody || hasCards;
+          })();
+        ''');
+        
+        if (hasContent == true) {
+          debugPrint('[Arcaea Helper] iOS: 检测到内容，尝试触发处理');
+          await _ensureScriptTriggered(controller);
+        } else {
+          debugPrint('[Arcaea Helper] iOS: 内容未就绪');
+        }
+      } catch (e) {
+        debugPrint('[Arcaea Helper] iOS: 检查失败: $e');
+      }
     }
     
-    // 延迟检查：500ms, 1s, 1.5s, 2s, 2.5s, 3s, 4s, 5s
-    final delays = [500, 1000, 1500, 2000, 2500, 3000, 4000, 5000];
+    // 延迟检查：使用更密集和更长时间的策略
+    // 前期密集检查，后期稀疏检查，总时长延长到20秒
+    final delays = [
+      400, 800, 1200, 1600,  // 前2秒，每400ms
+      2000, 2500, 3000,      // 2-3秒
+      3500, 4000, 5000,      // 3-5秒  
+      6000, 7000, 8000,      // 5-8秒
+      10000, 12000, 15000, 20000  // 8-20秒
+    ];
+    
     for (final delay in delays) {
       Future.delayed(Duration(milliseconds: delay), () {
-        if (mounted && !_hasTriggeredProcessing) {
+        if (mounted && !_hasTriggeredProcessing && _isTargetPage) {
           checkAndTrigger();
         }
       });

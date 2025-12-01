@@ -602,6 +602,8 @@ div[data-v-b3942f14].card .album-data .score .column {
 div[data-v-b3942f14] .section-2,
 [class*="section-2"] {
   width: 100% !important;
+  min-width: 80px !important;
+  max-width: 200px !important;
   height: auto !important;
   aspect-ratio: 1 / 1 !important;
   overflow: hidden !important;
