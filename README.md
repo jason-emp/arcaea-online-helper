@@ -211,6 +211,13 @@ floor(新总PTT * 100) / 100 >= floor(旧总PTT * 100) / 100 + 0.01
 
 ## 更新日志
 
+### v1.0.1
+- ✨ 添加 B30+R10 图片的生成导出功能
+- 🎨 优化UI和布局
+- 🌐 Chrome扩展采用Material Design设置页
+- 🐛 修复有概率不能正确注入网页的恶性bug
+- 🔧 修复其他问题
+
 ### v0.2.0
 - ✨ 重构为多端架构，支持 Chrome 扩展和基于 Flutter 的 Android / iOS 应用
 - 📦 提取共享核心模块 (shared_core)
