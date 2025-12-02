@@ -13,6 +13,7 @@ import 'services/data_update_service.dart';
 import 'services/image_generation_manager.dart';
 import 'services/update_service.dart';
 import 'services/webview_script_manager.dart';
+import 'widgets/score_list_page.dart';
 import 'widgets/settings_dialog.dart';
 
 void main() async {
@@ -47,7 +48,51 @@ class ArcaeaHelperApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const ArcaeaWebViewPage(),
+      home: const MainTabPage(),
+    );
+  }
+}
+
+class MainTabPage extends StatefulWidget {
+  const MainTabPage({super.key});
+
+  @override
+  State<MainTabPage> createState() => _MainTabPageState();
+}
+
+class _MainTabPageState extends State<MainTabPage> {
+  int _currentIndex = 0;
+
+  final List<Widget> _pages = const [
+    ArcaeaWebViewPage(),
+    ScoreListPage(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _pages,
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bar_chart),
+            label: 'B30/R10',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.list_alt),
+            label: '成绩列表',
+          ),
+        ],
+      ),
     );
   }
 }

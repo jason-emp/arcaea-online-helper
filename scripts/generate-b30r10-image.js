@@ -64,6 +64,7 @@ const CONFIG = {
     textTertiary: '#8b8b9e',
     scoreGold: '#ffd700',
     targetScore: '#10b981',
+    targetScoreRisky: '#f59e0b', // 橙色警告
     pttBlue: '#60a5fa',
     difficultyColors: {
       PST: '#0A82BE',
@@ -171,6 +172,20 @@ function drawGradientText(ctx, text, x, y, gradient) {
   grad.addColorStop(1, gradient.end);
   ctx.fillStyle = grad;
   ctx.fillText(text, x, y);
+}
+
+/**
+ * 计算单曲PTT
+ */
+function calculatePlayPTT(score, constant) {
+  if (score >= 10000000) {
+    return constant + 2;
+  } else if (score >= 9800000) {
+    return constant + 1 + (score - 9800000) / 200000;
+  } else {
+    const ptt = constant + (score - 9500000) / 300000;
+    return ptt < 0 ? 0 : ptt;
+  }
 }
 
 /**
@@ -491,7 +506,7 @@ async function drawCard(ctx, cardData, x, y) {
 /**
  * 绘制单个歌曲卡片（带目标分数）
  */
-async function drawCardWithTarget(ctx, cardData, x, y, totalPTT, isRecent = false) {
+async function drawCardWithTarget(ctx, cardData, x, y, totalPTT, isRecent = false, best30List = [], recent10List = []) {
   const { cardWidth, cardHeight, colors, fontSize } = CONFIG;
   
   // 卡片背景
@@ -626,6 +641,7 @@ async function drawCardWithTarget(ctx, cardData, x, y, totalPTT, isRecent = fals
   
   // 目标分数
   const targetScore = calculateTargetScore(cardData.constant, cardData.score, totalPTT);
+  
   if (targetScore !== null) {
     ctx.font = `bold ${fontSize.cardTarget}px "Fira Sans", "Microsoft YaHei", "PingFang SC", sans-serif`;
     ctx.fillStyle = colors.targetScore;
@@ -701,7 +717,7 @@ async function generateImage(jsonData, spinner) {
       spinner.text = `正在绘制卡片... (${processedCards}/${totalCards}) - B${i + 1}`;
     }
     
-    await drawCardWithTarget(ctx, jsonData.best30[i], x, y, totalPTT, false);
+    await drawCardWithTarget(ctx, jsonData.best30[i], x, y, totalPTT, false, jsonData.best30, jsonData.recent10);
   }
   
   // 再绘制 Recent 10（从位置30开始，即使Best 30不满30张）
@@ -718,7 +734,7 @@ async function generateImage(jsonData, spinner) {
       spinner.text = `正在绘制卡片... (${processedCards}/${totalCards}) - R${i + 1}`;
     }
     
-    await drawCardWithTarget(ctx, jsonData.recent10[i], x, y, totalPTT, true);
+    await drawCardWithTarget(ctx, jsonData.recent10[i], x, y, totalPTT, true, jsonData.best30, jsonData.recent10);
   }
   
   // 绘制底部文字

@@ -54,6 +54,7 @@ class ImageGeneratorService {
     final paint = Paint()..color = const Color(0xBF1A1A2E); // 0.75 opacity
     canvas.drawRect(headerDstRect, paint);
   }
+
   /// 根据分数计算评级
   static String getScoreGrade(int score) {
     if (score >= 10000000) return 'PM';
@@ -66,6 +67,18 @@ class ImageGeneratorService {
     return 'D';
   }
 
+  /// 计算单曲PTT（辅助方法）
+  static double? _calculatePlayPTT(int score, double constant) {
+    if (score >= 10000000) {
+      return constant + 2;
+    } else if (score >= 9800000) {
+      return constant + 1 + (score - 9800000) / 200000;
+    } else {
+      final ptt = constant + (score - 9500000) / 300000;
+      return ptt < 0 ? 0 : ptt;
+    }
+  }
+
   /// 计算目标分数（使PTT +0.01）
   static int? calculateTargetScore(
       double? constant, int currentScore, double? totalPTT) {
@@ -75,34 +88,19 @@ class ImageGeneratorService {
     final currentDisplayPTT = (totalPTT * 100).floor() / 100;
     final targetDisplayPTT = currentDisplayPTT + 0.01;
 
-    // 计算当前单曲PTT
-    double currentPlayPTT;
-    if (currentScore >= 10000000) {
-      currentPlayPTT = constant + 2;
-    } else if (currentScore >= 9800000) {
-      currentPlayPTT = constant + 1 + (currentScore - 9800000) / 200000;
-    } else {
-      currentPlayPTT = constant + (currentScore - 9500000) / 300000;
-      if (currentPlayPTT < 0) currentPlayPTT = 0;
-    }
+    final currentPlayPTT = _calculatePlayPTT(currentScore, constant);
+    if (currentPlayPTT == null) return null;
 
-    // 二分搜索目标分数
     int left = currentScore + 1;
     int right = 10000000;
     int? result;
 
     while (left <= right) {
-      final mid = ((left + right) / 2).floor();
-
-      // 计算新的单曲PTT
-      double newPlayPTT;
-      if (mid >= 10000000) {
-        newPlayPTT = constant + 2;
-      } else if (mid >= 9800000) {
-        newPlayPTT = constant + 1 + (mid - 9800000) / 200000;
-      } else {
-        newPlayPTT = constant + (mid - 9500000) / 300000;
-        if (newPlayPTT < 0) newPlayPTT = 0;
+      final mid = (left + right) ~/ 2;  // 使用整数除法避免精度问题
+      final newPlayPTT = _calculatePlayPTT(mid, constant);
+      if (newPlayPTT == null) {
+        left = mid + 1;
+        continue;
       }
 
       final newTotalPTT = totalPTT - currentPlayPTT / 40 + newPlayPTT / 40;
@@ -113,6 +111,21 @@ class ImageGeneratorService {
         right = mid - 1;
       } else {
         left = mid + 1;
+      }
+    }
+
+    // 验证结果是否真的能达到目标
+    if (result != null) {
+      final newPlayPTT = _calculatePlayPTT(result, constant);
+      if (newPlayPTT != null) {
+        final newTotalPTT = totalPTT - currentPlayPTT / 40 + newPlayPTT / 40;
+        final newDisplayPTT = (newTotalPTT * 100).floor() / 100;
+        
+        if ((newDisplayPTT - targetDisplayPTT).abs() < 0.0001) {
+          return result;
+        } else if (newDisplayPTT > targetDisplayPTT + 0.005) {
+          return result;
+        }
       }
     }
 
@@ -490,12 +503,13 @@ class ImageGeneratorService {
       );
     }
 
-    // 目标分数
+    // 目标分数（使用简化版，因为这里没有完整的B30/R10列表）
     final targetScore =
         calculateTargetScore(cardData.constant, cardData.score, totalPTT);
     if (targetScore != null) {
       final targetText = targetScore.toString().padLeft(8, '0');
       final formattedTarget = '>> ${targetText.substring(0, 2)}\' ${targetText.substring(2, 5)}\' ${targetText.substring(5)}';
+      
       textPainter.text = TextSpan(
         text: formattedTarget,
         style: const TextStyle(

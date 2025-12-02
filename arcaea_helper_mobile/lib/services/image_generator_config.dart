@@ -32,6 +32,7 @@ class ImageGeneratorConfig {
   static const Color textTertiary = Color(0xFF8B8B9E);
   static const Color scoreGold = Color(0xFFFFD700);
   static const Color targetScore = Color(0xFF10B981);
+  static const Color targetScoreRisky = Color(0xFFF59E0B); // 橙色警告
   static const Color pttBlue = Color(0xFF60A5FA);
 
   // 难度颜色
