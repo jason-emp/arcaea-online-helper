@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
@@ -87,6 +89,11 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   String? _cachedStyles;
   String? _cachedChartConstant;
   String? _cachedSonglist;
+  bool _isCheckingUpdate = false;
+  String? _currentVersion;
+  String? _latestAvailableVersion;
+  String? _updateStatusMessage;
+  bool _hasAutoCheckedUpdate = false;
 
   // 用于处理页面刷新时的临时跳转
   DateTime? _lastTargetPageTime;
@@ -102,6 +109,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     super.initState();
     _loadSettings();
     _preloadInjectionAssets();
+    _initializeVersionAndUpdateCheck();
   }
 
   @override
@@ -117,7 +125,6 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
       setState(() {
         showCharts = prefs.getBool('showCharts') ?? false;
         showConstant = prefs.getBool('showConstant') ?? true;
-        showPTT = prefs.getBool('showPTT') ?? true;
         showTargetScore = prefs.getBool('showTargetScore') ?? true;
         showDownloadButtons = prefs.getBool('showDownloadButtons') ?? true;
       });
@@ -129,6 +136,163 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
 
   void _preloadInjectionAssets() {
     unawaited(_ensureAssetsCached());
+  }
+
+  void _initializeVersionAndUpdateCheck() {
+    unawaited(() async {
+      await _loadAppInfo();
+      if (!mounted || _hasAutoCheckedUpdate) {
+        return;
+      }
+      _hasAutoCheckedUpdate = true;
+      await _checkForUpdate(autoTriggered: true);
+    }());
+  }
+
+  Future<void> _loadAppInfo() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _currentVersion = info.version;
+      });
+    } catch (e) {
+      debugPrint('[Arcaea Helper] 获取应用版本失败: $e');
+    }
+  }
+
+  Future<void> _checkForUpdate({bool autoTriggered = false}) async {
+    if (_isCheckingUpdate) {
+      return;
+    }
+
+    final shouldShowSnackBar = !autoTriggered;
+
+    setState(() {
+      _isCheckingUpdate = true;
+      _updateStatusMessage = '正在检查更新...';
+    });
+
+    try {
+      String? currentVersion = _currentVersion;
+      if (currentVersion == null) {
+        final info = await PackageInfo.fromPlatform();
+        currentVersion = info.version;
+        if (mounted) {
+          setState(() {
+            _currentVersion = currentVersion;
+          });
+        }
+      }
+
+      final uri = Uri.parse('https://api.github.com/repos/jason-emp/arcaea-online-helper/releases/latest');
+      final response = await http.get(
+        uri,
+        headers: const {'Accept': 'application/vnd.github+json'},
+      );
+
+      if (response.statusCode != 200) {
+        throw HttpException('GitHub 返回 ${response.statusCode}');
+      }
+
+      final jsonBody = jsonDecode(response.body) as Map<String, dynamic>;
+      final latestVersionRaw = (jsonBody['tag_name'] ?? jsonBody['name'] ?? '').toString().trim();
+
+      if (latestVersionRaw.isEmpty) {
+        throw const FormatException('未能获取最新版本号');
+      }
+
+      final hasUpdate = _isVersionNewer(latestVersionRaw, currentVersion);
+      final statusMessage = hasUpdate
+          ? '发现新版本 $latestVersionRaw，可点击下方“下载最新版本”'
+          : '当前版本 $currentVersion 已是最新';
+
+      if (mounted) {
+        setState(() {
+          _latestAvailableVersion = latestVersionRaw;
+          _updateStatusMessage = statusMessage;
+        });
+
+        if (hasUpdate) {
+          if (autoTriggered) {
+            await _showUpdateDialog(latestVersionRaw);
+          } else if (shouldShowSnackBar) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('发现新版本 $latestVersionRaw'),
+                action: SnackBarAction(
+                  label: '前往',
+                  onPressed: _launchLatestRelease,
+                ),
+              ),
+            );
+          }
+        } else if (shouldShowSnackBar) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('当前版本 $currentVersion 已是最新')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[Arcaea Helper] 检查更新失败: $e');
+      if (mounted) {
+        setState(() {
+          _updateStatusMessage = '检查更新失败: $e';
+        });
+
+        if (shouldShowSnackBar) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('检查更新失败: $e')),
+          );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCheckingUpdate = false;
+        });
+      }
+    }
+  }
+
+  bool _isVersionNewer(String latest, String current) {
+    final latestParts = _versionStringToParts(latest);
+    final currentParts = _versionStringToParts(current);
+    final maxLength = latestParts.length > currentParts.length
+        ? latestParts.length
+        : currentParts.length;
+
+    for (var i = 0; i < maxLength; i++) {
+      final latestPart = i < latestParts.length ? latestParts[i] : 0;
+      final currentPart = i < currentParts.length ? currentParts[i] : 0;
+      if (latestPart > currentPart) {
+        return true;
+      }
+      if (latestPart < currentPart) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  List<int> _versionStringToParts(String version) {
+    var sanitized = version.trim();
+    if (sanitized.toLowerCase().startsWith('v')) {
+      sanitized = sanitized.substring(1);
+    }
+
+    final numericPortion = sanitized.split(RegExp(r'[^0-9\.]')).firstWhere(
+          (segment) => segment.isNotEmpty,
+          orElse: () => '0',
+        );
+
+    return numericPortion
+        .split('.')
+        .where((segment) => segment.isNotEmpty)
+        .map((segment) => int.tryParse(segment) ?? 0)
+        .toList();
   }
 
   Future<void> _saveSettings() async {
@@ -537,6 +701,18 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   }
 
   Widget _buildSettingsPanel() {
+    final versionInfoParts = <String>[];
+    if (_currentVersion != null) {
+      versionInfoParts.add('当前版本 ${_currentVersion!}');
+    }
+    if (_latestAvailableVersion != null) {
+      versionInfoParts.add('最新版本 ${_latestAvailableVersion!}');
+    }
+    final versionInfoText = versionInfoParts.isEmpty
+        ? '当前版本信息暂不可用'
+        : versionInfoParts.join(' · ');
+    final updateStatusText = _updateStatusMessage ?? '点击“检查更新”以获取最新版本信息';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -650,6 +826,34 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
               color: Colors.grey[600],
             ),
           ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _isCheckingUpdate ? null : _checkForUpdate,
+            icon: _isCheckingUpdate
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.system_update_alt),
+            label: Text(_isCheckingUpdate ? '检查中...' : '检查更新'),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            versionInfoText,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            updateStatusText,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
         ],
       ),
     );
@@ -705,6 +909,35 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
         const SnackBar(content: Text('无法打开浏览器，请稍后再试')),
       );
     }
+  }
+
+  Future<void> _showUpdateDialog(String latestVersion) async {
+    if (!mounted) {
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('发现新版本'),
+          content: Text('检测到最新版本 $latestVersion，可前往 GitHub 下载最新构建。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('稍后再说'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                _launchLatestRelease();
+              },
+              child: const Text('前往下载'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   /// 从WebView获取B30/R10数据
