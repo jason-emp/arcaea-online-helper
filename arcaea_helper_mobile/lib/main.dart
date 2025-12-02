@@ -643,13 +643,11 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
       title: const Text('Arcaea Helper'),
       backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       actions: [
-        if (_scriptManager.state.isTargetPage &&
-            _imageManager.cachedData != null &&
-            !_imageManager.isGenerating)
+        if (_scriptManager.state.isTargetPage)
           IconButton(
             icon: const Icon(Icons.image),
             tooltip: '生成B30/R10图片',
-            onPressed: _generateImage,
+            onPressed: _imageManager.isGenerating ? null : _generateImage,
           ),
         IconButton(
           icon: const Icon(Icons.settings),
