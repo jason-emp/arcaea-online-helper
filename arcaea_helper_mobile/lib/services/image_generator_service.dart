@@ -39,8 +39,8 @@ class ImageGeneratorService {
     
     final blurPaint = Paint()
       ..imageFilter = ui.ImageFilter.blur(
-        sigmaX: 30.0, // 水平模糊半径
-        sigmaY: 30.0, // 垂直模糊半径
+        sigmaX: 50.0, // 水平模糊半径
+        sigmaY: 50.0, // 垂直模糊半径
         tileMode: TileMode.clamp,
       );
     
@@ -174,8 +174,6 @@ class ImageGeneratorService {
     Canvas canvas,
     PlayerData playerData,
   ) async {
-    final paint = Paint();
-
     // 绘制文字
     final textPainter = TextPainter(
       textDirection: TextDirection.ltr,
