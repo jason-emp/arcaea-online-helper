@@ -1,5 +1,11 @@
 // Arcaea Helper - Settings Popup Script
 
+// 数据源URL
+const DATA_SOURCES = {
+  songlist: 'https://raw.githubusercontent.com/DarrenDanielDay/arcaea-toolbelt-data/main/src/data/songlist.json',
+  chartConstant: 'https://raw.githubusercontent.com/DarrenDanielDay/arcaea-toolbelt-data/main/src/data/ChartConstant.json'
+};
+
 // 默认设置
 const DEFAULT_SETTINGS = {
   showCharts: false,  // 默认隐藏PTT变化图表
@@ -170,6 +176,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // 加载设置
   loadSettings();
   
+  // 加载上次更新时间
+  loadLastUpdateTime();
+  
   // 监听设置变化
   const settingCheckboxes = [
     'showCharts',
@@ -189,5 +198,109 @@ document.addEventListener('DOMContentLoaded', () => {
   // 监听导出数据按钮
   document.getElementById('exportDataButton').addEventListener('click', exportData);
   
+  // 监听更新数据按钮
+  document.getElementById('updateDataButton').addEventListener('click', updateData);
+  
   console.log('[Arcaea Helper Settings] 设置页面已初始化');
 });
+
+// ==================== 数据更新相关函数 ====================
+
+// 加载上次更新时间
+async function loadLastUpdateTime() {
+  try {
+    const result = await chrome.storage.local.get(['lastDataUpdate']);
+    if (result.lastDataUpdate) {
+      const lastUpdate = new Date(result.lastDataUpdate);
+      const now = new Date();
+      const diff = now - lastUpdate;
+      
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor(diff / (1000 * 60));
+      
+      let timeText = '';
+      if (days > 0) {
+        timeText = `上次更新: ${days} 天前`;
+      } else if (hours > 0) {
+        timeText = `上次更新: ${hours} 小时前`;
+      } else if (minutes > 0) {
+        timeText = `上次更新: ${minutes} 分钟前`;
+      } else {
+        timeText = '上次更新: 刚刚';
+      }
+      
+      document.getElementById('lastUpdateTime').textContent = timeText;
+    }
+  } catch (error) {
+    console.error('[Arcaea Helper Settings] 加载更新时间失败:', error);
+  }
+}
+
+// 更新数据
+async function updateData() {
+  const button = document.getElementById('updateDataButton');
+  const icon = button.querySelector('.material-symbols-rounded');
+  const timeElement = document.getElementById('lastUpdateTime');
+  
+  // 禁用按钮
+  button.disabled = true;
+  icon.textContent = 'hourglass_empty';
+  timeElement.textContent = '正在下载数据...';
+  
+  try {
+    // 下载Songlist.json
+    showStatusMessage('正在下载 Songlist.json...');
+    const songlistResponse = await fetch(DATA_SOURCES.songlist);
+    if (!songlistResponse.ok) {
+      throw new Error(`下载 Songlist.json 失败: ${songlistResponse.status}`);
+    }
+    const songlistData = await songlistResponse.json();
+    
+    // 下载ChartConstant.json
+    showStatusMessage('正在下载 ChartConstant.json...');
+    const chartConstantResponse = await fetch(DATA_SOURCES.chartConstant);
+    if (!chartConstantResponse.ok) {
+      throw new Error(`下载 ChartConstant.json 失败: ${chartConstantResponse.status}`);
+    }
+    const chartConstantData = await chartConstantResponse.json();
+    
+    // 保存到chrome.storage.local
+    showStatusMessage('正在保存数据...');
+    await chrome.storage.local.set({
+      songlistData: songlistData,
+      chartConstantData: chartConstantData,
+      lastDataUpdate: new Date().toISOString()
+    });
+    
+    // 更新显示
+    loadLastUpdateTime();
+    
+    // 通知所有Arcaea标签页数据已更新
+    const tabs = await chrome.tabs.query({ url: 'https://arcaea.lowiro.com/*/*' });
+    const arcaeaTabs = tabs.filter(tab => tab.url && tab.url.includes('/profile/potential'));
+    
+    arcaeaTabs.forEach(tab => {
+      chrome.tabs.sendMessage(tab.id, {
+        type: 'DATA_UPDATED',
+        songlistData: songlistData,
+        chartConstantData: chartConstantData
+      }).catch(() => {
+        // 忽略错误
+      });
+    });
+    
+    showStatusMessage('✓ 数据更新成功');
+    console.log('[Arcaea Helper Settings] 数据更新成功');
+    
+  } catch (error) {
+    console.error('[Arcaea Helper Settings] 数据更新失败:', error);
+    showStatusMessage('✗ 数据更新失败: ' + error.message, 'error');
+    timeElement.textContent = '更新失败，请重试';
+  } finally {
+    // 恢复按钮
+    button.disabled = false;
+    icon.textContent = 'cloud_download';
+  }
+}
+

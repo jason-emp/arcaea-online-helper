@@ -9,10 +9,11 @@ import 'package:url_launcher/url_launcher.dart';
 import 'core/constants.dart';
 import 'models/app_settings.dart';
 import 'models/b30r10_data.dart';
+import 'services/data_update_service.dart';
 import 'services/image_generation_manager.dart';
 import 'services/update_service.dart';
 import 'services/webview_script_manager.dart';
-import 'widgets/settings_panel.dart';
+import 'widgets/settings_dialog.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,12 +66,12 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   // UI状态
   double progress = 0;
   String currentUrl = '';
-  bool showSettings = false;
 
   // 服务和管理器
   late final WebViewScriptManager _scriptManager;
   late final ImageGenerationManager _imageManager;
   late final UpdateService _updateService;
+  late final DataUpdateService _dataUpdateService;
 
   // 设置
   late AppSettings _settings;
@@ -82,12 +83,18 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   String? _updateStatusMessage;
   bool _hasAutoCheckedUpdate = false;
 
+  // 数据更新状态
+  bool _isUpdatingData = false;
+  String? _dataUpdateMessage;
+  DateTime? _lastDataUpdateTime;
+
   @override
   void initState() {
     super.initState();
 
     // 初始化服务和管理器
     _updateService = UpdateService();
+    _dataUpdateService = DataUpdateService();
     _imageManager = ImageGenerationManager();
     _scriptManager = WebViewScriptManager(
       onB30R10DataReceived: _handleB30R10Data,
@@ -105,6 +112,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     await _loadSettings();
     await _scriptManager.preloadAssets();
     await _initializeVersionAndUpdateCheck();
+    await _loadLastDataUpdateTime();
   }
 
   @override
@@ -222,6 +230,70 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && mounted) {
       _showSnackBar('无法打开浏览器，请稍后再试');
+    }
+  }
+
+  // ==================== 数据更新方法 ====================
+
+  Future<void> _loadLastDataUpdateTime() async {
+    final lastUpdate = await _dataUpdateService.getLastUpdateTime();
+    if (mounted) {
+      setState(() {
+        _lastDataUpdateTime = lastUpdate;
+      });
+    }
+  }
+
+  Future<void> _updateData() async {
+    if (_isUpdatingData) return;
+
+    setState(() {
+      _isUpdatingData = true;
+      _dataUpdateMessage = '正在下载数据...';
+    });
+
+    try {
+      final result = await _dataUpdateService.updateAllData();
+
+      if (!mounted) return;
+
+      setState(() {
+        _dataUpdateMessage = result.message;
+        _lastDataUpdateTime = result.lastUpdateTime;
+      });
+
+      if (result.success) {
+        _showSnackBar(
+          '数据更新成功',
+          duration: const Duration(seconds: 2),
+        );
+        
+        if (_scriptManager.state.isTargetPage && webViewController != null) {
+          _showSnackBar(
+            '建议刷新页面以应用新数据',
+            action: SnackBarAction(
+              label: '刷新',
+              onPressed: () => webViewController?.reload(),
+            ),
+            duration: const Duration(seconds: 5),
+          );
+        }
+      } else {
+        _showSnackBar(result.message);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _dataUpdateMessage = '更新失败: $e';
+        });
+        _showSnackBar('数据更新失败: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingData = false;
+        });
+      }
     }
   }
 
@@ -560,7 +632,6 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
         children: [
           if (progress < 1.0) _buildProgressBar(),
           if (_imageManager.isGenerating) _buildGenerationProgress(),
-          if (showSettings) _buildSettings(),
           Expanded(child: _buildWebView()),
         ],
       ),
@@ -581,12 +652,8 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
             onPressed: _generateImage,
           ),
         IconButton(
-          icon: Icon(showSettings ? Icons.close : Icons.settings),
-          onPressed: () {
-            setState(() {
-              showSettings = !showSettings;
-            });
-          },
+          icon: const Icon(Icons.settings),
+          onPressed: _showSettingsDialog,
         ),
         if (currentUrl.isNotEmpty)
           IconButton(
@@ -633,19 +700,24 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     );
   }
 
-  Widget _buildSettings() {
-    return SettingsPanel(
+  void _showSettingsDialog() {
+    showSettingsDialog(
+      context: context,
       settings: _settings,
       onSettingsChanged: _onSettingsChanged,
       onGenerateImage: _generateImage,
       onDownloadLatest: _launchLatestRelease,
       onCheckUpdate: _checkForUpdate,
+      onUpdateData: _updateData,
       isCheckingUpdate: _isCheckingUpdate,
       isGeneratingImage: _imageManager.isGenerating,
+      isUpdatingData: _isUpdatingData,
       canGenerateImage: _scriptManager.state.isTargetPage,
       currentVersion: _currentVersion,
       latestVersion: _latestAvailableVersion,
       updateStatusMessage: _updateStatusMessage,
+      dataUpdateMessage: _dataUpdateMessage,
+      lastDataUpdateTime: _lastDataUpdateTime,
     );
   }
 
