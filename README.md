@@ -2,7 +2,9 @@
 
 [![Latest Release](https://img.shields.io/github/v/release/jason-emp/arcaea-online-helper?label=下载最新版本&style=for-the-badge&color=6750a4)](https://github.com/jason-emp/arcaea-online-helper/releases/latest)
 
-一个增强 Arcaea Online 查分页面的跨平台工具，支持 Android、 iOS 和 Chrome 扩展（Windows、 macOS、 Linux）。
+一个增强 Arcaea Online 查分页面的 Flutter 跨平台移动应用，支持 Android 和 iOS。
+
+> **注意**: Chrome 扩展版本已迁移到 [`legacy-chrome-extension`](https://github.com/jason-emp/arcaea-online-helper/tree/legacy-chrome-extension) 分支。
 
 ## 功能特性
 
@@ -11,132 +13,120 @@
 - 📈 **计算总PTT**：基于 Best 30 和 Recent 10 计算精确总 PTT
 - 🎯 **目标分数**：显示使显示 PTT +0.01 所需的目标分数
 - 💎 **定数表格**：展示不同分数等级所需的最低谱面定数
-- 🎨 **双列/三列布局**：PC 端优化显示
-- 🖼️ **B30/R10图片生成**：导出数据并生成精美的成绩图片（8行5列）
+- 🖼️ **B30/R10图片生成**：导出数据并生成精美的成绩图片
+- 📱 **内置 WebView**：无需离开应用即可浏览 Arcaea Online
 - ⚙️ **可自定义设置**：控制各项功能的显示
+- 🔄 **自动注入**：自动在网页中注入增强脚本和样式
 
 ## 🚀 快速开始
 
-### 自动同步工具
+### 环境要求
 
-本项目使用 Node.js 自动同步工具，文件保存在各自目录中，但会自动从 `shared_core` 同步更新。
+- Flutter SDK 3.0 或更高版本
+- Android SDK (用于 Android 开发)
+- Xcode (用于 iOS 开发，仅 macOS)
 
-```bash
-# 安装依赖
-npm install
+### 安装和运行
 
-# 开发模式（监听文件变化，自动同步）
-npm run sync:watch
-
-# 手动同步
-npm run sync
-```
-
-**⚠️ 重要**: 始终在 `shared_core/` 中修改代码，同步工具会自动复制到各个项目！
-
-详细说明请查看 [scripts/README.md](scripts/README.md)
-
----
-
-
-
-### 🔄 自动同步说明
-
-- **源文件**: 在 `shared_core/` 中修改
-- **目标文件**: 自动同步到 `chrome_extension/` 和 `arcaea_helper_mobile/`
-- **同步方式**: 运行 `npm run sync:watch` 自动监听变化
-
-
-## 安装和使用
-
-### Chrome 扩展
-
-1. 下载或克隆本仓库
-2. 运行 `npm install && npm run sync` 同步文件
-3. 打开 Chrome，访问 `chrome://extensions/`
-4. 启用"开发者模式"
-5. 点击"加载已解压的扩展程序"
-6. 选择 `chrome_extension` 文件夹
-7. 访问 https://arcaea.lowiro.com/*/profile/potential 即可使用
-
-### 设置选项
-
-点击扩展图标可打开设置面板：
-- **显示图表**：显示/隐藏 Best 30 和 Recent 10 的 PTT 变化图表
-- **显示定数**：在曲目名称旁显示谱面定数
-- **显示单曲PTT**：显示每首歌曲的 PTT 值
-- **显示目标分数**：显示推分目标分数
-- **显示下载按钮**：显示/隐藏截图下载按钮
-- **导出数据**：导出 B30/R10 数据为 JSON 文件，用于生成图片
-
-### 图片生成功能
-
-Chrome扩展支持导出 B30/R10 数据并生成精美的成绩图片：
-
-1. **导出数据**：在扩展设置面板点击"导出B30/R10数据"按钮
-2. **生成图片**：运行图片生成脚本
+1. **克隆仓库**
    ```bash
-   npm install  # 首次使用需要安装依赖
-   npm run generate-image <导出的JSON文件路径>
+   git clone https://github.com/jason-emp/arcaea-online-helper.git
+   cd arcaea-online-helper/arcaea_helper_mobile
    ```
-3. **查看结果**：生成的PNG图片包含玩家信息和8行5列的歌曲卡片
 
-详细说明请查看 [IMAGE_GENERATOR_README.md](IMAGE_GENERATOR_README.md)
+2. **安装依赖**
+   ```bash
+   flutter pub get
+   ```
 
-### 移动应用
+3. **运行应用**
+   ```bash
+   # 调试模式
+   flutter run
 
-1. 确保已安装 Flutter SDK
-2. 运行 `npm install && npm run sync` 同步文件
-3. 进入 `arcaea_helper_mobile` 目录
-4. 运行 `flutter pub get` 安装依赖
-5. 运行 `flutter run` 启动应用
+   # 发布构建
+   flutter build apk  # Android
+   flutter build ios  # iOS
+   ```
 
-**依赖项**：
+### 主要依赖项
+
 - `flutter_inappwebview: ^6.0.0` - WebView 组件
 - `shared_preferences: ^2.2.2` - 本地存储
-- `path_provider: ^2.1.1` - 路径访问
+- `path_provider: ^2.1.1` - 文件路径访问
+- `package_info_plus: ^8.0.0` - 应用信息获取
+- `gal: ^2.3.0` - 图片保存到相册
 
-**特性**：
-- 内置 WebView 浏览 Arcaea Online
-- 自动注入 shared_core 脚本和样式
-- 内置设置面板，无需离开应用
-- 支持刷新和导航
+## 使用说明
+
+1. **启动应用**：打开应用后会自动加载 Arcaea Online 网页
+2. **登录账号**：在内置浏览器中登录你的 Arcaea 账号
+3. **查看成绩**：访问成绩页面，增强功能会自动生效
+4. **调整设置**：点击设置按钮自定义显示选项
+5. **生成图片**：导出数据并生成 B30/R10 成绩图片
 
 ## 技术架构
 
-### 代码共享策略
+### WebView 集成
 
-**新架构**：
-1. **源文件**: 所有共享代码存放在 `shared_core/`
-2. **同步工具**: 使用 Node.js 脚本自动同步到各项目
-3. **独立部署**: 每个项目拥有自己的文件副本，互不依赖
-4. **开发流程**: 修改 `shared_core/` → 自动同步 → 测试各项目
+- 使用 `flutter_inappwebview` 提供完整的浏览器功能
+- 自动注入 JavaScript 脚本和 CSS 样式
+- 支持与网页的双向通信
 
-**优势**：
-- ✅ 文件独立，Chrome 扩展无需加载整个项目
-- ✅ 各项目可独立部署和打包
-- ✅ 保持代码共享的便利性
-- ✅ 避免相对路径引用问题
+### 资源管理
 
-### 同步规则
+- 谱面定数数据存储在 `assets/data/ChartConstant.json`
+- 曲目信息存储在 `assets/data/Songlist.json`
+- 使用 `rootBundle.loadString()` 加载 JSON 数据
+- 通过 `evaluateJavascript()` 将数据传递给网页
 
-| 源文件 | Chrome 扩展 | Flutter 应用 |
-|--------|------------|-------------|
-| `shared_core/js/*.js` | `chrome_extension/js/*.js` | `arcaea_helper_mobile/web/js/*.js` |
-| `shared_core/css/*.css` | `chrome_extension/css/*.css` | `arcaea_helper_mobile/web/css/*.css` |
-| `shared_core/data/*.json` | `chrome_extension/data/*.json` | `arcaea_helper_mobile/assets/data/*.json` |
+### 图片生成功能
 
-### Chrome 扩展实现
+应用内集成了 B30/R10 成绩图片生成功能：
 
-- 使用 `chrome.runtime.getURL()` 加载 shared_core 资源
-- Manifest V3 配置 `web_accessible_resources` 允许页面访问资源
-- Content Script 引入 shared_core 模块后执行业务逻辑
+1. 在成绩页面点击"生成图片"按钮
+2. 应用会自动收集数据并生成精美的成绩图片
+3. 图片包含玩家信息和完整的成绩卡片（8行5列布局）
+4. 生成后可直接保存到相册或分享
 
-### Flutter 应用实现
+详细使用说明请查看 [arcaea_helper_mobile/IMAGE_GENERATOR_GUIDE.md](arcaea_helper_mobile/IMAGE_GENERATOR_GUIDE.md)
 
-- 使用 `rootBundle.loadString()` 加载 shared_core 资源
-- 通过 `evaluateJavascript()` 注入脚本到 WebView
-- 将 JSON 数据直接传递给 JavaScript 环境
+## 项目结构
+
+```
+arcaea_helper_mobile/
+├── lib/
+│   ├── main.dart                 # 应用入口
+│   ├── core/
+│   │   └── constants.dart        # 常量定义
+│   ├── models/                   # 数据模型
+│   │   ├── app_settings.dart
+│   │   ├── score_data.dart
+│   │   └── b30r10_data.dart
+│   ├── services/                 # 业务逻辑
+│   │   ├── score_fetch_service.dart
+│   │   ├── score_storage_service.dart
+│   │   ├── image_generator_service.dart
+│   │   ├── webview_script_manager.dart
+│   │   └── update_service.dart
+│   └── widgets/                  # UI 组件
+│       ├── score_list_page.dart
+│       ├── settings_panel.dart
+│       └── settings_dialog.dart
+├── assets/
+│   ├── data/                     # 谱面数据
+│   │   ├── ChartConstant.json
+│   │   └── Songlist.json
+│   └── fonts/                    # 字体文件
+├── web/
+│   ├── js/                       # JavaScript 脚本
+│   │   ├── arcaea-calculator.js
+│   │   ├── arcaea-data-loader.js
+│   │   └── flutter-content.js
+│   └── css/
+│       └── arcaea-styles.css     # 样式文件
+└── pubspec.yaml                  # 依赖配置
+```
 
 ## 算法说明
 
@@ -173,32 +163,76 @@ floor(新总PTT * 100) / 100 >= floor(旧总PTT * 100) / 100 + 0.01
 
 ## 开发指南
 
-### 开发工作流
+### 开发环境设置
 
-1. **启动监听模式**
+1. **安装 Flutter**：访问 [Flutter 官网](https://flutter.dev/docs/get-started/install) 安装 Flutter SDK
+
+2. **配置编辑器**：推荐使用 VS Code 或 Android Studio
+
+3. **克隆项目**
    ```bash
-   npm run sync:watch
+   git clone https://github.com/jason-emp/arcaea-online-helper.git
+   cd arcaea-online-helper/arcaea_helper_mobile
    ```
 
-2. **修改代码**
-   - 在 `shared_core/` 中修改算法、样式或数据
-   - 文件会自动同步到各个项目
+4. **安装依赖**
+   ```bash
+   flutter pub get
+   ```
 
-3. **测试**
-   - Chrome 扩展：重新加载扩展，刷新网页
-   - Flutter 应用：热重载或重启应用
+### 开发工作流
 
-### 修改算法
+1. **修改代码**
+   - 算法相关：编辑 `web/js/arcaea-calculator.js`
+   - 样式相关：编辑 `web/css/arcaea-styles.css`
+   - 数据更新：替换 `assets/data/` 中的 JSON 文件
+   - Flutter 代码：编辑 `lib/` 中的相关文件
 
-编辑 `shared_core/js/arcaea-calculator.js`：
+2. **测试**
+   ```bash
+   # 热重载
+   在运行中的应用中按 'r'
+   
+   # 热重启
+   在运行中的应用中按 'R'
+   
+   # 完全重新构建
+   flutter run
+   ```
 
-### 修改样式
+3. **调试**
+   ```bash
+   # 查看日志
+   flutter logs
+   
+   # 连接调试器
+   flutter attach
+   ```
 
-编辑 `shared_core/css/arcaea-styles.css`
+### 构建发布版本
 
-### 更新数据
+**Android**:
+```bash
+# APK
+flutter build apk --release
 
-替换 `shared_core/data/` 中的 JSON 文件，然后运行 `npm run sync`
+# App Bundle (推荐用于 Google Play)
+flutter build appbundle --release
+```
+
+**iOS**:
+```bash
+flutter build ios --release
+```
+
+### 更新数据文件
+
+当 Arcaea 更新曲目或谱面定数时：
+
+1. 获取最新的 `ChartConstant.json` 和 `Songlist.json`
+2. 替换 `assets/data/` 中的对应文件
+3. 运行 `flutter pub get` 更新资源
+4. 测试并发布新版本
 
 ## 许可证
 
@@ -207,21 +241,26 @@ floor(新总PTT * 100) / 100 >= floor(旧总PTT * 100) / 100 + 0.01
 ## 致谢
 
 - 感谢 Arcaea 社区维护的谱面定数数据
-- 感谢所有贡献者
+- 感谢所有贡献者和用户的支持
 
 ## 更新日志
 
+### v2.0.0 (2024-12-08)
+- 🔄 重构为纯 Flutter 项目
+- 🗑️ 移除 Chrome 扩展（已迁移到 legacy-chrome-extension 分支）
+- 🗑️ 移除 Node.js 图片生成脚本
+- 📱 专注于移动端体验优化
+- 📝 更新项目文档和结构
+
 ### v1.0.1
 - ✨ 添加 B30+R10 图片的生成导出功能
-- 🎨 优化UI和布局
-- 🌐 Chrome扩展采用Material Design设置页
-- 🐛 修复有概率不能正确注入网页的恶性bug
+- 🎨 优化 UI 和布局
+- 🐛 修复注入网页的问题
 - 🔧 修复其他问题
 
 ### v0.2.0
-- ✨ 重构为多端架构，支持 Chrome 扩展和基于 Flutter 的 Android / iOS 应用
-- 📦 提取共享核心模块 (shared_core)
-- 🔧 新增 Node.js 自动同步工具
+- ✨ 重构为多端架构，支持 Chrome 扩展和 Flutter 应用
+- 📦 提取共享核心模块
 - 🎨 优化代码结构，提高可维护性
 
 ### v0.1.0
@@ -230,22 +269,32 @@ floor(新总PTT * 100) / 100 >= floor(旧总PTT * 100) / 100 + 0.01
 
 ## 常见问题
 
-**Q: 为什么需要运行同步工具？**  
-A: 为了保持各项目文件独立，同时共享核心代码。这样 Chrome 扩展和 Flutter 应用都可以独立部署。
+**Q: Chrome 扩展版本还维护吗？**  
+A: Chrome 扩展代码已迁移到 [`legacy-chrome-extension`](https://github.com/jason-emp/arcaea-online-helper/tree/legacy-chrome-extension) 分支，但不再积极维护。建议使用 Flutter 移动应用。
 
-**Q: 我可以直接修改 chrome_extension 中的文件吗？**  
-A: 不推荐，因为下次同步会覆盖你的修改。请始终在 `shared_core/` 中修改。
+**Q: 如何更新谱面数据？**  
+A: 替换 `arcaea_helper_mobile/assets/data/` 中的 JSON 文件，然后运行 `flutter pub get` 重新构建资源。
 
-**Q: 同步工具会覆盖我的自定义修改吗？**  
-A: 同步工具只同步特定文件（算法、样式、数据），不会影响各项目特有的文件（如 manifest.json、main.dart 等）。
+**Q: 支持哪些平台？**  
+A: 目前支持 Android 和 iOS。理论上也支持 Windows、macOS 和 Linux 桌面平台，但未经充分测试。
 
-**Q: Flutter 应用如何更新数据？**  
-A: 在 `shared_core/data/` 中替换 JSON 文件，运行 `npm run sync`，然后 `flutter pub get` 重新构建资源。
+**Q: 如何报告问题或提出建议？**  
+A: 请通过 [GitHub Issues](https://github.com/jason-emp/arcaea-online-helper/issues) 提交。
+
+**Q: 为什么要移除 Chrome 扩展？**  
+A: 为了简化项目结构，专注于移动端开发。Chrome 扩展的功能已完整保留在单独的分支中。
 
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request！
 
+贡献指南：
+1. Fork 本仓库
+2. 创建你的特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交你的修改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启一个 Pull Request
+
 ## 联系方式
 
-如有问题或建议，请通过 GitHub Issues 联系。
+如有问题或建议，请通过 [GitHub Issues](https://github.com/jason-emp/arcaea-online-helper/issues) 联系。
