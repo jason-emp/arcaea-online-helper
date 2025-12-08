@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
-import '../models/app_settings.dart';
 
 /// 显示设置对话框
 Future<void> showSettingsDialog({
   required BuildContext context,
-  required AppSettings settings,
-  required ValueChanged<AppSettings> onSettingsChanged,
   required VoidCallback onGenerateImage,
   required VoidCallback onDownloadLatest,
   required VoidCallback onCheckUpdate,
@@ -23,8 +20,6 @@ Future<void> showSettingsDialog({
   return showDialog<void>(
     context: context,
     builder: (context) => _SettingsDialog(
-      settings: settings,
-      onSettingsChanged: onSettingsChanged,
       onGenerateImage: onGenerateImage,
       onDownloadLatest: onDownloadLatest,
       onCheckUpdate: onCheckUpdate,
@@ -44,8 +39,6 @@ Future<void> showSettingsDialog({
 
 /// 设置对话框Widget
 class _SettingsDialog extends StatelessWidget {
-  final AppSettings settings;
-  final ValueChanged<AppSettings> onSettingsChanged;
   final VoidCallback onGenerateImage;
   final VoidCallback onDownloadLatest;
   final VoidCallback onCheckUpdate;
@@ -61,8 +54,6 @@ class _SettingsDialog extends StatelessWidget {
   final DateTime? lastDataUpdateTime;
 
   const _SettingsDialog({
-    required this.settings,
-    required this.onSettingsChanged,
     required this.onGenerateImage,
     required this.onDownloadLatest,
     required this.onCheckUpdate,
@@ -128,59 +119,6 @@ class _SettingsDialog extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      '显示设置',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildSettingSwitch(
-                      '显示图表',
-                      'Best 30 / Recent 10 的 PTT 变化图表',
-                      settings.showCharts,
-                      (value) => onSettingsChanged(settings.copyWith(showCharts: value)),
-                    ),
-                    _buildSettingSwitch(
-                      '显示定数',
-                      '在曲目名称旁显示谱面定数',
-                      settings.showConstant,
-                      (value) => onSettingsChanged(settings.copyWith(showConstant: value)),
-                    ),
-                    _buildSettingSwitch(
-                      '显示单曲PTT',
-                      '在曲目旁显示该曲目的PTT值',
-                      settings.showPTT,
-                      (value) => onSettingsChanged(settings.copyWith(showPTT: value)),
-                    ),
-                    _buildSettingSwitch(
-                      '显示目标分数',
-                      '显示使显示PTT +0.01 所需的目标分数',
-                      settings.showTargetScore,
-                      (value) => onSettingsChanged(settings.copyWith(showTargetScore: value)),
-                    ),
-                    _buildSettingSwitch(
-                      '显示下载按钮',
-                      '显示截图下载和背景选择按钮',
-                      settings.showDownloadButtons,
-                      (value) => onSettingsChanged(settings.copyWith(showDownloadButtons: value)),
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: canGenerateImage && !isGeneratingImage ? onGenerateImage : null,
-                            icon: const Icon(Icons.image),
-                            label: const Text('生成B30/R10图片'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '自动获取页面数据并生成精美图片',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                    const SizedBox(height: 16),
                     FilledButton.icon(
                       onPressed: onDownloadLatest,
                       icon: const Icon(Icons.download),
@@ -246,38 +184,6 @@ class _SettingsDialog extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildSettingSwitch(
-    String title,
-    String subtitle,
-    bool value,
-    ValueChanged<bool> onChanged,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-              ],
-            ),
-          ),
-          Switch(value: value, onChanged: onChanged),
-        ],
       ),
     );
   }

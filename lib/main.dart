@@ -13,6 +13,7 @@ import 'services/data_update_service.dart';
 import 'services/image_generation_manager.dart';
 import 'services/update_service.dart';
 import 'services/webview_script_manager.dart';
+import 'widgets/b30r10_page.dart';
 import 'widgets/score_list_page.dart';
 import 'widgets/settings_dialog.dart';
 
@@ -47,6 +48,7 @@ class ArcaeaHelperApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         useMaterial3: true,
+        fontFamily: 'Fira Sans',
       ),
       home: const MainTabPage(),
     );
@@ -62,37 +64,207 @@ class MainTabPage extends StatefulWidget {
 
 class _MainTabPageState extends State<MainTabPage> {
   int _currentIndex = 0;
+  final GlobalKey<_ArcaeaWebViewPageState> _webViewKey = GlobalKey();
+  bool _lastLoginState = false;
+  bool _showWebView = false; // 控制是否显示 WebView
 
-  final List<Widget> _pages = const [
-    ArcaeaWebViewPage(),
-    ScoreListPage(),
-  ];
+  void _navigateToWebView() {
+    setState(() {
+      _showWebView = true;
+      _currentIndex = 1; // WebView索引
+    });
+  }
+
+  void _refreshData() {
+    _webViewKey.currentState?._fetchB30R10Data();
+  }
+
+  void _refreshWebView() {
+    _webViewKey.currentState?.webViewController?.reload();
+  }
+
+  // 包装方法以访问 WebView 的功能
+  void _generateImage() async {
+    final webViewState = _webViewKey.currentState;
+    if (webViewState == null) return;
+    
+    // 开始生成前更新状态
+    if (mounted) setState(() {});
+    
+    // 启动定时器，在生成过程中定期更新状态
+    Timer? updateTimer;
+    if (webViewState._imageManager.isGenerating) {
+      updateTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+        if (mounted && webViewState._imageManager.isGenerating) {
+          setState(() {});
+        } else {
+          timer.cancel();
+        }
+      });
+    }
+    
+    await webViewState._generateImage();
+    
+    // 取消定时器
+    updateTimer?.cancel();
+    
+    // 生成完成后更新主页面状态
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _checkUpdate() async {
+    await _webViewKey.currentState?._checkForUpdate();
+    // 检查完成后更新主页面状态
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _updateData() async {
+    await _webViewKey.currentState?._updateData();
+    // 更新完成后更新主页面状态
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _launchLatestRelease() {
+    _webViewKey.currentState?._launchLatestRelease();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isLoggedIn = _webViewKey.currentState?._scriptManager.state.isTargetPage ?? false;
+    
+    // 检测登录状态变化
+    if (isLoggedIn != _lastLoginState) {
+      _lastLoginState = isLoggedIn;
+      // 如果刚刚登录，延迟更新以确保状态同步，并隐藏 WebView
+      if (isLoggedIn) {
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            setState(() {
+              _showWebView = false;
+              _currentIndex = 0; // 返回 B30/R10 页面
+            });
+          }
+        });
+      }
+    }
+    
+    // 根据是否显示 WebView 决定页面列表和索引映射
+    final webViewState = _webViewKey.currentState;
+    final List<Widget> pages = _showWebView
+        ? [
+            B30R10Page(
+              imageManager: webViewState?._imageManager ?? ImageGenerationManager(),
+              isLoggedIn: isLoggedIn,
+              onNavigateToWebView: _navigateToWebView,
+              onRefreshData: _refreshData,
+              onRefreshWebView: _refreshWebView,
+              onGenerateImage: _generateImage,
+              onDownloadLatest: _launchLatestRelease,
+              onCheckUpdate: _checkUpdate,
+              onUpdateData: _updateData,
+              isCheckingUpdate: webViewState?._isCheckingUpdate ?? false,
+              isGeneratingImage: webViewState?._imageManager.isGenerating ?? false,
+              isUpdatingData: webViewState?._isUpdatingData ?? false,
+              currentVersion: webViewState?._currentVersion,
+              latestVersion: webViewState?._latestAvailableVersion,
+              updateStatusMessage: webViewState?._updateStatusMessage,
+              dataUpdateMessage: webViewState?._dataUpdateMessage,
+              lastDataUpdateTime: webViewState?._lastDataUpdateTime,
+            ),
+            ArcaeaWebViewPage(key: _webViewKey),
+            const ScoreListPage(),
+          ]
+        : [
+            B30R10Page(
+              imageManager: webViewState?._imageManager ?? ImageGenerationManager(),
+              isLoggedIn: isLoggedIn,
+              onNavigateToWebView: _navigateToWebView,
+              onRefreshData: _refreshData,
+              onRefreshWebView: _refreshWebView,
+              onGenerateImage: _generateImage,
+              onDownloadLatest: _launchLatestRelease,
+              onCheckUpdate: _checkUpdate,
+              onUpdateData: _updateData,
+              isCheckingUpdate: webViewState?._isCheckingUpdate ?? false,
+              isGeneratingImage: webViewState?._imageManager.isGenerating ?? false,
+              isUpdatingData: webViewState?._isUpdatingData ?? false,
+              currentVersion: webViewState?._currentVersion,
+              latestVersion: webViewState?._latestAvailableVersion,
+              updateStatusMessage: webViewState?._updateStatusMessage,
+              dataUpdateMessage: webViewState?._dataUpdateMessage,
+              lastDataUpdateTime: webViewState?._lastDataUpdateTime,
+            ),
+            const ScoreListPage(),
+            ArcaeaWebViewPage(key: _webViewKey), // 保持在列表中以维持状态
+          ];
+    
+    // 当不显示 WebView 时，调整索引映射
+    final int displayIndex = _showWebView ? _currentIndex : (_currentIndex >= 2 ? 2 : _currentIndex);
+    
     return Scaffold(
       body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
+        index: displayIndex,
+        children: pages,
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart),
-            label: 'B30/R10',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.list_alt),
-            label: '成绩列表',
-          ),
-        ],
-      ),
+      bottomNavigationBar: _showWebView
+          ? BottomNavigationBar(
+              currentIndex: _currentIndex,
+              onTap: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+                // 当切换到B30/R10标签时，确保状态更新
+                if (index == 0) {
+                  Future.delayed(const Duration(milliseconds: 100), () {
+                    if (mounted) setState(() {});
+                  });
+                }
+              },
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.bar_chart),
+                  label: 'B30/R10',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.web),
+                  label: 'WebView',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.list_alt),
+                  label: '成绩列表',
+                ),
+              ],
+            )
+          : BottomNavigationBar(
+              currentIndex: _currentIndex.clamp(0, 1),
+              onTap: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+                // 当切换到B30/R10标签时，确保状态更新
+                if (index == 0) {
+                  Future.delayed(const Duration(milliseconds: 100), () {
+                    if (mounted) setState(() {});
+                  });
+                }
+              },
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.bar_chart),
+                  label: 'B30/R10',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.list_alt),
+                  label: '成绩列表',
+                ),
+              ],
+            ),
     );
   }
 }
@@ -118,8 +290,8 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   late final UpdateService _updateService;
   late final DataUpdateService _dataUpdateService;
 
-  // 设置
-  late AppSettings _settings;
+  // 默认设置（用于WebView）
+  final AppSettings _settings = AppSettings();
 
   // 更新检查状态
   bool _isCheckingUpdate = false;
@@ -146,15 +318,11 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
       onDebugMessage: (message) => debugPrint('[ScriptManager] $message'),
     );
 
-    // 初始化设置
-    _settings = AppSettings();
-
     // 异步初始化
     _initializeAsync();
   }
 
   Future<void> _initializeAsync() async {
-    await _loadSettings();
     await _scriptManager.preloadAssets();
     await _initializeVersionAndUpdateCheck();
     await _loadLastDataUpdateTime();
@@ -167,19 +335,6 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   }
 
   // ==================== 初始化方法 ====================
-
-  Future<void> _loadSettings() async {
-    try {
-      final settings = await AppSettings.load();
-      if (mounted) {
-        setState(() {
-          _settings = settings;
-        });
-      }
-    } catch (e) {
-      debugPrint('[Arcaea Helper] 加载设置失败: $e');
-    }
-  }
 
   Future<void> _initializeVersionAndUpdateCheck() async {
     _currentVersion = await _updateService.getCurrentVersion();
@@ -340,30 +495,6 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
         });
       }
     }
-  }
-
-  // ==================== 设置管理方法 ====================
-
-  Future<void> _saveSettings() async {
-    try {
-      await _settings.save();
-      debugPrint('[Arcaea Helper] 设置已保存');
-      await _applySettings();
-    } catch (e) {
-      debugPrint('[Arcaea Helper] 保存设置失败: $e');
-    }
-  }
-
-  Future<void> _applySettings() async {
-    if (webViewController == null) return;
-    await _scriptManager.applySettings(webViewController!, _settings);
-  }
-
-  void _onSettingsChanged(AppSettings newSettings) {
-    setState(() {
-      _settings = newSettings;
-    });
-    _saveSettings();
   }
 
   // ==================== 数据处理方法 ====================
@@ -746,8 +877,6 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   void _showSettingsDialog() {
     showSettingsDialog(
       context: context,
-      settings: _settings,
-      onSettingsChanged: _onSettingsChanged,
       onGenerateImage: _generateImage,
       onDownloadLatest: _launchLatestRelease,
       onCheckUpdate: _checkForUpdate,
