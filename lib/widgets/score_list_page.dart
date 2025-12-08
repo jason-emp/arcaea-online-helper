@@ -20,7 +20,6 @@ class _ScoreListPageState extends State<ScoreListPage> {
   bool _isLoading = true;
   int _currentPage = 0;
   DateTime? _lastUpdateTime;
-  String _currentDifficulty = '';
   bool _hasFetched = false;
 
   @override
@@ -34,7 +33,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
     try {
       final scores = await _storageService.loadScores();
       final lastUpdate = await _storageService.getLastUpdateTime();
-      
+
       if (mounted) {
         setState(() {
           _scores = scores;
@@ -65,9 +64,9 @@ class _ScoreListPageState extends State<ScoreListPage> {
 
     _fetchService.errorStream.listen((error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error)));
       }
     });
 
@@ -75,14 +74,6 @@ class _ScoreListPageState extends State<ScoreListPage> {
       if (mounted) {
         setState(() {
           _isFetching = progress >= 0;
-        });
-      }
-    });
-
-    _fetchService.difficultyStream.listen((difficulty) {
-      if (mounted) {
-        setState(() {
-          _currentDifficulty = difficulty;
         });
       }
     });
@@ -99,8 +90,13 @@ class _ScoreListPageState extends State<ScoreListPage> {
       _scores = [];
       _currentPage = 0;
     });
+
+    // 显示进度条弹窗
+    _showProgressDialog();
+
     _fetchService.startFetching().then((_) {
       if (mounted) {
+        Navigator.of(context).pop(); // 关闭进度条弹窗
         setState(() {
           _hasFetched = true;
         });
@@ -109,16 +105,69 @@ class _ScoreListPageState extends State<ScoreListPage> {
   }
 
   void _startUpdating() {
+    // 显示进度条弹窗
+    _showProgressDialog();
+
     _fetchService.startUpdating().then((_) async {
-      // 更新完成后重新加载成绩
       if (mounted) {
+        Navigator.of(context).pop(); // 关闭进度条弹窗
+        // 更新完成后重新加载成绩
         await _loadCachedScores();
       }
     });
   }
 
-  void _stopFetching() {
-    _fetchService.stopFetching();
+  void _showProgressDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: const Text('拉取成绩'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const LinearProgressIndicator(),
+              const SizedBox(height: 16),
+              StreamBuilder<String>(
+                stream: _fetchService.difficultyStream,
+                builder: (context, snapshot) {
+                  final difficulty = snapshot.data ?? '';
+                  return Text(
+                    difficulty.isNotEmpty
+                        ? '正在拉取 $difficulty 难度第 $_currentPage 页...'
+                        : '准备中...',
+                    textAlign: TextAlign.center,
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              StreamBuilder<ScoreListResponse>(
+                stream: _fetchService.scoreStream,
+                builder: (context, snapshot) {
+                  final count = snapshot.data?.scores.length ?? _scores.length;
+                  return Text(
+                    '已获取 $count 条成绩',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  );
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _fetchService.stopFetching();
+                Navigator.of(context).pop();
+              },
+              child: const Text('停止'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _clearCache() async {
@@ -149,15 +198,15 @@ class _ScoreListPageState extends State<ScoreListPage> {
           _hasFetched = false;
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('缓存已清除')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('缓存已清除')));
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('清除失败: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('清除失败: $e')));
         }
       }
     }
@@ -169,12 +218,6 @@ class _ScoreListPageState extends State<ScoreListPage> {
       appBar: AppBar(
         title: const Text('成绩列表'),
         actions: [
-          if (_isFetching)
-            IconButton(
-              icon: const Icon(Icons.stop),
-              onPressed: _stopFetching,
-              tooltip: '停止',
-            ),
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == 'clear') {
@@ -198,19 +241,14 @@ class _ScoreListPageState extends State<ScoreListPage> {
       ),
       body: Column(
         children: [
-          // 状态栏
-          if (_isFetching || _scores.isNotEmpty)
+          // 显示最后更新时间
+          if (_lastUpdateTime != null && !_isFetching)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              color: _isFetching ? Colors.blue[50] : Colors.green[50],
+              color: Colors.green[50],
               child: Row(
                 children: [
-                  if (_isFetching)
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
+                  Icon(Icons.check_circle, color: Colors.green[700], size: 20),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -218,25 +256,22 @@ class _ScoreListPageState extends State<ScoreListPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          _isFetching
-                              ? '正在拉取 $_currentDifficulty 难度第 $_currentPage 页...'
-                              : '已加载 ${_scores.length} 条成绩',
+                          '已加载 ${_scores.length} 条成绩',
                           style: TextStyle(
-                            color: _isFetching ? Colors.blue[900] : Colors.green[900],
+                            color: Colors.green[900],
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        if (_lastUpdateTime != null && !_isFetching)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              '最后更新: ${_formatDateTime(_lastUpdateTime!)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.green[700],
-                              ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            '最后更新: ${_formatDateTime(_lastUpdateTime!)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.green[700],
                             ),
                           ),
+                        ),
                       ],
                     ),
                   ),
@@ -245,9 +280,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
             ),
 
           // 成绩列表
-          Expanded(
-            child: _buildScoreList(),
-          ),
+          Expanded(child: _buildScoreList()),
         ],
       ),
       floatingActionButton: _isFetching
@@ -279,9 +312,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
 
   Widget _buildScoreList() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_scores.isEmpty && !_isFetching) {
@@ -289,26 +320,16 @@ class _ScoreListPageState extends State<ScoreListPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.music_note,
-              size: 80,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.music_note, size: 80, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
               '暂无成绩数据',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
             ),
             const SizedBox(height: 8),
             Text(
               '点击下方按钮开始拉取',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[500],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
             ),
           ],
         ),
@@ -420,10 +441,7 @@ class _ScoreCard extends StatelessWidget {
                   // 作者
                   Text(
                     score.artist,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -507,10 +525,7 @@ class _ScoreCard extends StatelessWidget {
                   // 日期
                   Text(
                     score.obtainedDate,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[500],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                   ),
                 ],
               ),
