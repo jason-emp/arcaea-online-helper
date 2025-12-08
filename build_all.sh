@@ -10,6 +10,6 @@ echo "=== Build Android split-per-abi APKs ==="
 flutter build apk --release --split-per-abi
 
 echo "=== Build iOS IPA (no-codesign) ==="
-flutter build ipa --release --no-codesign
+flutter build ipa --release --export-method development
 
 echo "=== ALL BUILD DONE ==="
