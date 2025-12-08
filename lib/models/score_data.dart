@@ -60,11 +60,13 @@ class ScoreListResponse {
   final List<ScoreData> scores;
   final int currentPage;
   final bool hasNextPage;
+  final double? playerPTT;
 
   ScoreListResponse({
     required this.scores,
     required this.currentPage,
     required this.hasNextPage,
+    this.playerPTT,
   });
 
   factory ScoreListResponse.fromJson(Map<String, dynamic> json) {
@@ -74,6 +76,9 @@ class ScoreListResponse {
           .toList(),
       currentPage: json['currentPage'] as int,
       hasNextPage: json['hasNextPage'] as bool,
+      playerPTT: json['playerPTT'] != null
+          ? (json['playerPTT'] as num).toDouble()
+          : null,
     );
   }
 
@@ -82,6 +87,7 @@ class ScoreListResponse {
       'scores': scores.map((e) => e.toJson()).toList(),
       'currentPage': currentPage,
       'hasNextPage': hasNextPage,
+      'playerPTT': playerPTT,
     };
   }
 }

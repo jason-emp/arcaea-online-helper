@@ -156,6 +156,10 @@ class _MainTabPageState extends State<MainTabPage> {
     
     // 根据是否显示 WebView 决定页面列表和索引映射
     final webViewState = _webViewKey.currentState;
+    final scoreListPage = ScoreListPage(
+      imageManager: webViewState?._imageManager,
+    );
+
     final List<Widget> pages = _showWebView
         ? [
             B30R10Page(
@@ -178,7 +182,7 @@ class _MainTabPageState extends State<MainTabPage> {
               lastDataUpdateTime: webViewState?._lastDataUpdateTime,
             ),
             ArcaeaWebViewPage(key: _webViewKey),
-            const ScoreListPage(),
+            scoreListPage,
           ]
         : [
             B30R10Page(
@@ -200,7 +204,7 @@ class _MainTabPageState extends State<MainTabPage> {
               dataUpdateMessage: webViewState?._dataUpdateMessage,
               lastDataUpdateTime: webViewState?._lastDataUpdateTime,
             ),
-            const ScoreListPage(),
+            scoreListPage,
             ArcaeaWebViewPage(key: _webViewKey), // 保持在列表中以维持状态
           ];
     

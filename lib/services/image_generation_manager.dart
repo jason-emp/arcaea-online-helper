@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/b30r10_data.dart';
@@ -7,7 +8,7 @@ import '../services/image_generator_service.dart';
 import '../core/constants.dart';
 
 /// 图片生成管理器
-class ImageGenerationManager {
+class ImageGenerationManager extends ChangeNotifier {
   bool _isGenerating = false;
   String _progress = '';
   B30R10Data? _cachedData;
@@ -16,7 +17,10 @@ class ImageGenerationManager {
   String get progress => _progress;
   B30R10Data? get cachedData => _cachedData;
 
-  set cachedData(B30R10Data? data) => _cachedData = data;
+  set cachedData(B30R10Data? data) {
+    _cachedData = data;
+    notifyListeners();
+  }
 
   /// 生成B30/R10图片
   Future<String> generateImage({
@@ -28,6 +32,7 @@ class ImageGenerationManager {
     }
 
     _isGenerating = true;
+    notifyListeners();
     onProgressUpdate('准备生成图片...');
 
     try {
@@ -65,6 +70,7 @@ class ImageGenerationManager {
     } finally {
       _isGenerating = false;
       _progress = '';
+      notifyListeners();
     }
   }
 
@@ -72,5 +78,6 @@ class ImageGenerationManager {
     _isGenerating = false;
     _progress = '';
     _cachedData = null;
+    notifyListeners();
   }
 }

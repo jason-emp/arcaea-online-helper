@@ -1,7 +1,7 @@
 name: arcaea_helper_mobile
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.0.1+2
+version: 1.1.0+3
 
 environment:
   sdk: ^3.10.1
@@ -41,6 +41,7 @@ flutter:
     - web/css/arcaea-styles.css
     - assets/data/ChartConstant.json
     - assets/data/Songlist.json
+    - assets/data/chart-data.json
   
   fonts:
     - family: Fira Sans

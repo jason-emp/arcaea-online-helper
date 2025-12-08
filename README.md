@@ -1,333 +1,353 @@
 # 🎵 Arcaea Helper Mobile
 
-一个基于 Flutter 的跨平台移动应用，用于增强 Arcaea Online 查分页面体验，支持 Android 和 iOS 平台。提供谱面定数显示、PTT 计算、推分辅助等多项实用功能。
+一个基于 Flutter 的跨平台 Arcaea Online 辅助应用，专注于提供完整的成绩管理和数据分析功能。支持 Android 和 iOS 平台。
 
 **目前定数表适用于移动版 v6.11.0。**
 
 ---
 
-## ✨ 功能特点
+## ✨ 核心功能
 
-### 📊 核心功能
+### 📊 B30/R10 成绩展示
+采用原生 Flutter 设计，提供流畅稳定的成绩浏览体验：
+
 - 🎯 **谱面定数显示** - 在曲目名称旁显示定数，如 `Tempestissimo (11.3)`
-- 💎 **单曲 PTT 计算** - 实时计算并显示每首歌的 Potential
+- 💎 **单曲 PTT 计算** - 实时计算并显示每首歌的 Potential 值
 - 🎓 **精确总 PTT** - 基于 Best 30 和 Recent 10 计算准确的总 PTT 值
 - 🎯 **推分目标提示** - 显示使显示 PTT +0.01 所需的目标分数
-- 📈 **定数需求卡片** - 展示达到 +0.01 PTT 所需的最低谱面定数（EX+、EX、995W 等）
-- 🔢 **曲目编号** - 自动为 Best 30 (#1-#30) 和 Recent 10 (R1-R10) 添加序号
-- 📍 **分隔线** - 在 Best 30 和 Recent 10 之间添加视觉分隔
-- 🖼️ **图片生成** - 一键生成精美的 B30/R10 图片（2400x3900高分辨率）
+- 📈 **定数需求卡片** - 展示达到 +0.01 PTT 所需的最低谱面定数（EX+、EX、995W 等级别）
+- 🔢 **序号标识** - 自动为 Best 30 (#1-#30) 和 Recent 10 (R1-R10) 添加序号
+- 🖼️ **图片导出** - 一键生成高清 B30/R10 图片（2400x3900分辨率，PNG格式）
+- 📱 **自动保存** - 生成的图片自动保存到相册，可直接分享
 
-### 🎨 图片生成功能 ✨新增
-- 📸 **一键生成** - 直接在手机上生成精美的 B30/R10 图片
-- 🎨 **高清输出** - 2400x3900 像素，PNG 格式
-- 📊 **完整信息** - 包含所有歌曲卡片、定数、PTT、目标分数
-- 🖼️ **精美设计** - 曲绘背景、渐变效果、专业排版
-- 📱 **即时分享** - 生成完成后直接分享到社交媒体或保存
-- ⚡ **自动提取** - 无需手动导出，自动从页面获取数据
-- 📈 **实时进度** - 显示生成进度，清晰了解处理状态
+### 📋 全成绩列表管理
+全新的成绩列表功能，提供深度数据分析：
 
-👉 [查看图片生成详细指南](./IMAGE_GENERATOR_GUIDE.md) | [快速开始](./QUICKSTART_IMAGE_GENERATOR.md)
+- 📥 **全量拉取** - 自动从 Arcaea Online 拉取所有难度的全部成绩
+- 🔄 **增量更新** - 支持增量更新模式，只拉取新成绩，节省时间
+- 💾 **本地存储** - 成绩数据持久化保存，离线也可查看
+- 🔍 **搜索功能** - 支持曲目名称搜索，快速定位
+- 🎚️ **多维度筛选**：
+  - 按难度筛选（PST/PRS/FTR/ETR/BYD）
+  - 按等级筛选（定数范围）
+  - 按分数筛选（分数段）
+  - 按 PTT 筛选（PTT 范围）
+  - 按目标分数筛选（推分候选）
+  - 只显示 B30/R10 中的曲目
+- 📊 **多种排序方式**：
+  - 按日期排序（最新/最早）
+  - 按定数排序
+  - 按单曲 PTT 排序
+  - 按成绩排序
+  - **按目标分数排序** - 找出最容易推分的曲目
+  - **按目标差值排序** - 显示距离目标最近的成绩
+- 🎯 **智能推分建议**：
+  - 自动计算每首歌的目标分数（已在 B30/R10 中）
+  - 计算替代 B30 最低成绩的目标分数
+  - 计算替代 R10 最低成绩的目标分数
+  - 显示最优推分路径（B30 或 R10）
+- 📈 **可视化展示** - 成绩卡片显示歌曲封面、定数、PTT、目标等完整信息
+- 📊 **统计信息** - 显示总成绩数、筛选结果数量、上次更新时间
 
-### 📱 移动端特性
-- 📲 **内置 WebView** - 无需切换应用，直接在应用内浏览 Arcaea Online
-- ⚙️ **内置设置面板** - 点击设置按钮即可调整显示选项，无需离开应用
-- 🔄 **自动注入** - 页面加载时自动注入脚本和样式
-- 💾 **本地存储** - 设置自动保存，重启应用后保持
-- 🔒 **离线数据** - 谱面定数和曲目列表内置于应用，无需网络加载
-
-### 🎮 兼容性
-- ✅ **支持所有难度** - Past / Present / Future / Beyond / Eternal
-- 🔄 **动态更新** - 自动处理页面路由变化和动态加载
-- 🌍 **多语言支持** - 支持英文和日文曲目名称
-- 📱 **跨平台** - Android 和 iOS 通用
-
-### ⚡ 技术特性
-- 🚀 **性能优化** - Flutter 原生性能，流畅体验
-- 🔒 **隐私安全** - 完全本地运行，不收集任何数据
-- 🛡️ **稳定可靠** - 基于 shared_core 核心模块，与 Chrome 扩展共享逻辑
 
 ---
 
 ## 🚀 快速开始
 
-### 前置要求
+### 📱 用户使用
 
-⚠️ **重要：需要用户订阅了 Arcaea Online**
+⚠️ **前提条件**：需要已订阅 [Arcaea Online](https://arcaea.lowiro.com/) 服务
 
-本应用仅适用于已订阅 Arcaea Online 服务的用户。如果您还未订阅，请访问 [Arcaea 官网](https://arcaea.lowiro.com/) 进行订阅。
+#### 基本使用流程
 
-**开发环境要求：**
+1. **首次使用 - 登录**
+   - 打开应用，等待 3 次重试失败后点击进入 Webview 登录后回到 B30 / R10 页
+
+2. **查看 B30/R10**
+   - 点击底部导航栏的「B30/R10」标签
+   - 点击「刷新数据」从 Arcaea Online 获取最新数据
+   - 查看详细的成绩卡片、定数、PTT、推分目标
+
+3. **导出 B30/R10 图片**
+   - 在「B30/R10」页面，点击设置按钮
+   - 选择「生成图片」
+   - 等待生成完成后，图片会自动保存到相册
+
+4. **分析成绩与推分**
+   - 在「成绩列表」中使用筛选功能找出推分候选
+   - 按「目标分数」或「目标差值」排序，找出最容易提升的曲目
+   - 查看每首歌的目标分数和推荐路径（替代 B30 或 R10）
+
+5. **更新成绩**
+   - 在「成绩列表」中点击「增量更新」只拉取新成绩
+   - 或点击「拉取」重新拉取全部成绩
+
+### 🛠️ 开发者使用
+
+**环境要求：**
 - Flutter SDK >= 3.10.1
 - Dart SDK >= 3.10.1
 - Android Studio / Xcode（根据目标平台）
-- Node.js（用于运行同步工具）
 
-### 安装步骤
+**构建发布版本：**
 
-1. **克隆仓库**
-   ```bash
-   git clone <repository-url>
-   cd arcaea-online-helper
-   ```
-
-2. **同步共享代码**
-   ```bash
-   npm install
-   npm run sync
-   ```
-   这会将 `shared_core/` 中的核心代码同步到移动应用。
-
-3. **安装 Flutter 依赖**
-   ```bash
-   cd arcaea_helper_mobile
-   flutter pub get
-   ```
-
-4. **运行应用**
-   ```bash
-   # Android
-   flutter run
-
-   # iOS (需要 macOS)
-   flutter run -d ios
-
-   # 选择特定设备
-   flutter devices
-   flutter run -d <device-id>
-   ```
-
-### 打包发布
-
-**Android APK:**
 ```bash
+# Android APK
 flutter build apk --release
-# APK 位于: build/app/outputs/flutter-apk/app-release.apk
-```
 
-**Android App Bundle (推荐用于 Google Play):**
-```bash
+# Android App Bundle (用于 Google Play)
 flutter build appbundle --release
-# AAB 位于: build/app/outputs/bundle/release/app-release.aab
-```
 
-**iOS (需要 Apple Developer 账号):**
-```bash
+# iOS (需要 Apple Developer 账号)
 flutter build ios --release
-# 然后在 Xcode 中打开 ios/Runner.xcworkspace 进行签名和上传
+# 然后在 Xcode 中打开 ios/Runner.xcworkspace 进行签名
 ```
-
----
-
-## 📱 使用指南
-
-### 首次使用
-
-1. 启动应用后，会自动打开 Arcaea Online 网站
-2. 登录你的 Arcaea 账号
-3. 导航到 Profile -> Potential 页面
-4. 应用会自动显示：
-   - 谱面定数（灰色）
-   - 单曲 PTT（紫色粗体）
-   - 推分目标分数（绿色）
-   - 总 PTT（用户名旁）
-   - 定数需求卡片（B1 前方）
-
-### ⚙️ 设置面板
-
-点击右上角的设置图标（⚙️）打开设置面板，可以自定义：
-
-| 设置项 | 说明 | 默认值 |
-|--------|------|--------|
-| **显示图表** | 显示/隐藏 Best 30/Recent 10 的 PTT 变化图表 | 隐藏 |
-| **显示定数** | 在曲目名称旁显示谱面定数 | 显示 |
-| **显示单曲PTT** | 显示每首歌曲的 PTT 值 | 显示 |
-| **显示目标分数** | 显示推分目标分数 | 显示 |
-| **显示下载按钮** | 显示/隐藏截图下载和背景选择按钮 | 显示 |
-
-💡 **提示：** 设置会自动保存到本地，下次打开应用时会自动应用。
-
-### 刷新页面
-
-点击右上角的刷新按钮（🔄）可以重新加载当前页面。
-
----
 
 ## 🛠️ 技术架构
+
+### 应用架构
+
+```
+lib/
+├── main.dart                  # 应用入口，标签页导航
+├── core/
+│   └── constants.dart         # 全局常量配置
+├── models/                    # 数据模型
+│   ├── app_settings.dart      # 应用设置
+│   ├── b30r10_data.dart       # B30/R10 数据结构
+│   ├── score_data.dart        # 成绩数据结构
+│   ├── score_filter.dart      # 筛选条件
+│   └── score_sort_option.dart # 排序选项
+├── services/                  # 业务逻辑层
+│   ├── webview_script_manager.dart     # WebView 脚本注入管理
+│   ├── image_generation_manager.dart   # 图片生成状态管理
+│   ├── image_generator_service.dart    # 图片生成核心服务
+│   ├── score_fetch_service.dart        # 成绩拉取服务（使用 HeadlessWebView）
+│   ├── score_storage_service.dart      # 成绩本地存储
+│   ├── song_data_service.dart          # 歌曲元数据服务
+│   ├── data_update_service.dart        # 定数数据更新
+│   └── update_service.dart             # 应用版本检查
+└── widgets/                   # UI 组件
+    ├── b30r10_page.dart       # B30/R10 展示页面
+    ├── score_list_page.dart   # 成绩列表页面
+    ├── score_filter_dialog.dart # 筛选对话框
+    └── settings_dialog.dart   # 设置对话框
+```
 
 ### 核心依赖
 
 ```yaml
 dependencies:
-  flutter_inappwebview: ^6.0.0    # 内置 WebView 组件
+  flutter_inappwebview: ^6.0.0    # WebView 组件（页面浏览和数据拉取）
   shared_preferences: ^2.2.2      # 本地设置存储
   path_provider: ^2.1.1           # 文件路径访问
-  image: ^4.1.7                   # 图片处理（图片生成）
-  http: ^1.2.0                    # 网络请求（加载曲绘）
-  permission_handler: ^11.3.0     # 权限管理
-  share_plus: ^7.2.1              # 分享功能
+  image: ^4.1.7                   # 图片处理
+  http: ^1.2.0                    # HTTP 请求（加载曲绘）
+  intl: ^0.19.0                   # 国际化和日期格式化
+  gal: ^2.3.0                     # 相册访问（保存图片）
+  package_info_plus: ^9.0.0       # 应用版本信息
+  url_launcher: ^6.3.0            # 打开外部链接
 ```
 
-### 代码共享策略
+### 数据流程
 
-本应用使用 **shared_core** 模块共享核心逻辑：
-
+#### 1. B30/R10 数据获取
 ```
-shared_core/
-  ├── js/
-  │   ├── arcaea-calculator.js      # PTT 计算逻辑
-  │   ├── arcaea-data-loader.js     # 数据加载模块
-  │   └── flutter-content.js        # Flutter 内容脚本
-  ├── css/
-  │   └── arcaea-styles.css         # 样式表
-  └── data/
-      ├── ChartConstant.json        # 谱面定数数据
-      └── Songlist.json             # 曲目列表数据
+用户点击刷新
+  ↓
+WebView 加载 Arcaea Online /profile/potential 页面
+  ↓
+注入 JavaScript 脚本
+  ↓
+提取页面中的 B30/R10 数据
+  ↓
+通过 JavaScript Handler 传回 Flutter
+  ↓
+解析为 B30R10Data 模型
+  ↓
+更新 ImageGenerationManager 状态
+  ↓
+UI 自动刷新显示
 ```
 
-**同步流程：**
-1. 在项目根目录运行 `npm run sync`
-2. 脚本自动复制文件：
-   - `shared_core/js/*.js` → `arcaea_helper_mobile/web/js/`
-   - `shared_core/css/*.css` → `arcaea_helper_mobile/web/css/`
-   - `shared_core/data/*.json` → `arcaea_helper_mobile/assets/data/`
-3. Flutter 通过 `rootBundle.loadString()` 加载资源
+#### 2. 全成绩拉取
+```
+用户点击拉取按钮
+  ↓
+创建 HeadlessInAppWebView（无界面 WebView）
+  ↓
+依次访问所有难度的成绩列表页面
+  ↓
+每个页面注入数据提取脚本
+  ↓
+解析 JSON 数据为 ScoreData 列表
+  ↓
+保存到本地 SharedPreferences
+  ↓
+更新 UI 显示
+```
 
-### 脚本注入流程
+#### 3. 图片生成
+```
+用户点击生成图片
+  ↓
+ImageGenerationManager 触发
+  ↓
+ImageGeneratorService 创建画布
+  ↓
+依次绘制：
+  - 背景渐变
+  - 玩家信息头部
+  - B30 成绩卡片（下载曲绘）
+  - R10 成绩卡片
+  - 定数需求卡片
+  ↓
+编码为 PNG
+  ↓
+保存到临时目录
+  ↓
+通过 Gal 保存到相册
+  ↓
+显示完成提示
+```
+
+### 推分算法
+
+#### PTT 计算公式
 
 ```dart
-1. WebView 加载 Arcaea Online 页面
-   ↓
-2. onLoadStop 回调触发
-   ↓
-3. 检测是否为 /profile/potential 页面
-   ↓
-4. 依次注入：
-   - CSS 样式
-   - arcaea-calculator.js
-   - arcaea-data-loader.js
-   - 初始化数据 (ChartConstant.json, Songlist.json)
-   - 设置配置
-   - flutter-content.js
-   ↓
-5. 触发页面处理函数
-   ↓
-6. 显示增强功能
+单曲 PTT = 
+  if (score >= 10,000,000)
+    constant + 2.0
+  else if (score >= 9,800,000)
+    constant + 1.0 + (score - 9,800,000) / 200,000.0
+  else
+    constant + (score - 9,500,000) / 300,000.0
+
+总 PTT = (Best 30 PTT 之和 + Recent 10 PTT 之和) / 40
+显示 PTT = floor(总 PTT * 100) / 100
 ```
+
+#### 目标分数计算
+
+使用二分搜索算法，寻找最小分数 S，使得：
+
+```dart
+新总 PTT = 旧总 PTT - 旧单曲 PTT / 40 + 新单曲 PTT(S) / 40
+floor(新总 PTT * 100) / 100 >= floor(旧总 PTT * 100) / 100 + 0.01
+```
+
+#### 智能推分建议
+
+对于不在 B30/R10 中的成绩，计算两种推分路径：
+
+1. **替代 B30 路径**：计算替代 B30 中最低成绩所需的目标分数
+2. **替代 R10 路径**：计算替代 R10 中最低成绩所需的目标分数
+
+选择目标分数更低（更容易达成）的路径显示给用户。
 
 ---
 
 ## 📊 算法说明
 
-### PTT 计算公式
+### 成绩筛选逻辑
 
-```
-单曲PTT =
-  - score >= 10,000,000: constant + 2
-  - score >= 9,800,000:  constant + 1 + (score - 9,800,000) / 200,000
-  - score < 9,800,000:   constant + (score - 9,500,000) / 300,000
-```
+支持多条件组合筛选：
 
-### 总PTT 计算
+- **难度筛选**：可选择一个或多个难度
+- **定数范围**：最小值 ≤ 定数 ≤ 最大值
+- **分数范围**：最小值 ≤ 分数 ≤ 最大值
+- **PTT 范围**：最小值 ≤ PTT ≤ 最大值
+- **目标分数范围**：最小值 ≤ 目标 ≤ 最大值
+- **仅显示有目标**：只显示可推分的成绩
+- **仅 B30/R10**：只显示在 B30/R10 中的成绩
 
-```
-总PTT = (Best 30 单曲PTT之和 + Recent 10 单曲PTT之和) / 40
-显示PTT = floor(总PTT * 100) / 100
-```
+### 排序选项
 
-### 目标分数计算
-
-使用二分搜索找到最小分数 S，使得：
-```
-新总PTT = 旧总PTT - 旧单曲PTT/40 + 新单曲PTT/40
-floor(新总PTT * 100) / 100 >= floor(旧总PTT * 100) / 100 + 0.01
-```
-
-### 推分定数计算
-
-计算使显示 PTT +0.01 所需的最低谱面定数，考虑三种场景：
-- 场景A：仅替换 Recent 10 最低值
-- 场景B：仅替换 Best 30 最低值
-- 场景C：同时替换两者
+| 排序方式 | 说明 | 适用场景 |
+|---------|------|---------|
+| 日期降序 | 最新成绩在前 | 查看最近游玩 |
+| 日期升序 | 最早成绩在前 | 查看历史成绩 |
+| 定数降序 | 定数高的在前 | 挑战高难度 |
+| PTT 降序 | PTT 高的在前 | 查看高质量成绩 |
+| 成绩降序 | 分数高的在前 | 查看高分 |
+| 成绩升序 | 分数低的在前 | 找出可提升的成绩 |
+| 目标升序 | 目标分数低的在前 | **推分优先** - 找最容易达成的目标 |
+| 目标降序 | 目标分数高的在前 | 查看高难度目标 |
+| 目标差值升序 | 距离目标最近的在前 | **推分优先** - 差一点就能达成的 |
+| 目标差值降序 | 距离目标最远的在前 | 查看差距大的成绩 |
 
 ---
 
-## 🔧 开发指南
+## 🔧 常见问题
 
-### 开发工作流
+### Q: 为什么需要拉取成绩？
+A: Arcaea Online 的 B30/R10 页面只显示最佳成绩，不包含所有历史成绩。通过拉取全部成绩，可以进行更深入的分析，例如找出所有可以推分的曲目。
 
-1. **启动同步监听**
-   ```bash
-   # 在项目根目录
-   npm run sync:watch
-   ```
+### Q: 增量更新和完整拉取有什么区别？
+A: 
+- **完整拉取**：重新拉取所有难度的所有成绩，耗时较长但数据最完整
+- **增量更新**：只拉取新产生的成绩（通过日期判断），速度快，适合日常更新
 
-2. **修改共享代码**
-   - 在 `shared_core/` 中修改算法、样式或数据
-   - 文件会自动同步到 `arcaea_helper_mobile/`
+### Q: 目标分数是如何计算的？
+A: 根据您当前的总 PTT，计算出每首歌需要达到多少分才能使显示 PTT +0.01。对于不在 B30/R10 中的歌，会计算替代 B30 或 R10 最低成绩所需的分数。
 
-3. **热重载测试**
-   ```bash
-   # 在 arcaea_helper_mobile 目录
-   flutter run
-   # 代码修改后按 'r' 热重载，按 'R' 热重启
-   ```
+### Q: 图片生成失败怎么办？
+A: 
+1. 确保已授予相册访问权限
+2. 确保已成功获取 B30/R10 数据
+3. 检查设备存储空间是否充足
+4. 尝试重新拉取数据后再生成
 
-4. **调试**
-   ```bash
-   # 查看日志
-   flutter logs
+### Q: 定数数据如何更新？
+A: 在设置对话框中点击「更新定数数据」，应用会从 GitHub 仓库下载最新的 ChartConstant.json 文件。
 
-   # Chrome DevTools (需要在 Android 上启用 WebView 调试)
-   chrome://inspect
-   ```
+---
 
-### 修改核心逻辑
+## 📝 更新历史
 
-⚠️ **重要：** 始终在 `shared_core/` 中修改，而不是直接修改 `arcaea_helper_mobile/web/` 或 `arcaea_helper_mobile/assets/`！
+### v1.1.0 
+- 🎨 **B30/R10页面重构** - 改为原生Flutter样式，提高稳定性和性能
+- 📊 **曲目列表功能** - 新增曲目列表功能，支持拉取全部成绩并进行详细全面的分析
+- 🚫 **Chrome扩展维护终止** - 专注于移动端开发，不再维护Chrome扩展
+- 🐛 **问题修复** - 修复已知问题，提升整体稳定性
 
-**修改算法：**
-```bash
-# 编辑
-vim shared_core/js/arcaea-calculator.js
+### v1.0.1
+- ✨ 添加 B30+R10 图片的生成导出功能
+- 🎨 优化UI和布局
+- 🌐 Chrome扩展采用Material Design设置页
+- 🐛 修复有概率不能正确注入网页的恶性bug
+- 🔧 修复其他问题
 
-# 同步
-npm run sync
+### v0.2.0
+- ✨ 重构为多端架构，支持 Chrome 扩展和基于 Flutter 的 Android / iOS 应用
+- 📦 提取共享核心模块 (shared_core)
+- 🔧 新增 Node.js 自动同步工具
+- 🎨 优化代码结构，提高可维护性
 
-# 测试
-cd arcaea_helper_mobile
-flutter run
-```
+### v0.1.0
+- 🎉 首次发布
+- 📊 支持 Chrome 扩展
 
-**修改样式：**
-```bash
-# 编辑
-vim shared_core/css/arcaea-styles.css
+---
 
-# 同步和测试
-npm run sync
-cd arcaea_helper_mobile
-flutter run
-```
+## 📄 许可证
 
-**更新数据：**
-```bash
-# 替换数据文件
-cp new-data/ChartConstant.json shared_core/data/
-cp new-data/Songlist.json shared_core/data/
+本项目采用 MIT 许可证。详见 LICENSE 文件。
 
-# 同步
-npm run sync
+---
 
-# 重新获取资源
-cd arcaea_helper_mobile
-flutter pub get
-flutter run
-```
+## 🙏 致谢
 
-### 调试技巧
+- [Arcaea](https://arcaea.lowiro.com/) - lowiro 开发的音乐游戏
+- [Flutter](https://flutter.dev/) - 跨平台应用开发框架
+- 社区贡献的谱面定数数据
 
-**WebView 控制台日志：**
+---
+
+## ⚠️ 免责声明
+
+本应用为第三方非官方工具，与 lowiro 或 Arcaea 官方无关。使用本应用产生的任何问题，开发者概不负责。请遵守 Arcaea Online 的使用条款。
 ```dart
 // 在 main.dart 中已配置
 onConsoleMessage: (controller, consoleMessage) {
@@ -347,117 +367,6 @@ flutter run
 2. 样式异常 → 检查 CSS 是否注入成功
 3. PTT 计算错误 → 查看控制台错误信息
 
----
-
-## ❓ 常见问题
-
-<details>
-<summary><strong>Q1: 应用无法显示定数/PTT？</strong></summary>
-
-**解决步骤：**
-1. 确认已运行 `npm run sync` 同步代码
-2. 重启应用
-3. 在设置面板中确认相关选项已启用
-4. 刷新页面（点击刷新按钮）
-5. 查看应用日志：`flutter logs`
-</details>
-
-<details>
-<summary><strong>Q2: 如何更新谱面定数数据？</strong></summary>
-
-**更新步骤：**
-1. 访问 [Arcaea 中文维基](https://arcwiki.mcd.blue/) 获取最新数据：
-   - [ChartConstant.json](https://arcwiki.mcd.blue/index.php?title=Template:ChartConstant.json&action=edit)
-   - [Songlist.json](https://arcwiki.mcd.blue/index.php?title=Template:Songlist.json&action=edit)
-
-2. 替换 `shared_core/data/` 中的文件
-
-3. 运行同步：
-   ```bash
-   npm run sync
-   cd arcaea_helper_mobile
-   flutter pub get
-   flutter run
-   ```
-</details>
-
-<details>
-<summary><strong>Q3: iOS 构建失败怎么办？</strong></summary>
-
-**常见解决方案：**
-
-```bash
-# 清理缓存
-cd ios
-pod deintegrate
-pod install
-cd ..
-
-# 重新构建
-flutter clean
-flutter pub get
-flutter build ios
-```
-
-如果仍有问题，检查：
-- Xcode 版本是否最新
-- CocoaPods 是否正确安装
-- iOS Deployment Target 是否兼容
-</details>
-
-<details>
-<summary><strong>Q4: Android 构建 APK 体积太大？</strong></summary>
-
-**优化方案：**
-
-```bash
-# 构建分架构 APK
-flutter build apk --split-per-abi --release
-
-# 这会生成多个 APK：
-# - app-armeabi-v7a-release.apk (ARM 32-bit)
-# - app-arm64-v8a-release.apk (ARM 64-bit)
-# - app-x86_64-release.apk (x86 64-bit)
-```
-
-或使用 App Bundle（Google Play 推荐）：
-```bash
-flutter build appbundle --release
-```
-</details>
-
-<details>
-<summary><strong>Q5: 设置无法保存？</strong></summary>
-
-**检查项：**
-1. 确认 `shared_preferences` 依赖已正确安装
-2. Android：检查应用权限
-3. iOS：检查是否有写入限制
-
-**测试：**
-```dart
-// 在 main.dart 中添加日志
-debugPrint('[Settings] 保存: showCharts=$showCharts');
-```
-</details>
-
-<details>
-<summary><strong>Q6: 应用崩溃或白屏？</strong></summary>
-
-**调试步骤：**
-```bash
-# 查看详细日志
-flutter run --verbose
-
-# 检查错误堆栈
-# FlutterError.onError 已在 main.dart 中配置
-```
-
-**常见原因：**
-- WebView 初始化失败
-- 资源文件未正确加载
-- JavaScript 注入错误
-</details>
 
 ---
 
@@ -488,36 +397,6 @@ arcaea_helper_mobile/
 ├── IMAGE_GENERATOR_GUIDE.md   # 图片生成详细指南
 ├── QUICKSTART_IMAGE_GENERATOR.md  # 图片生成快速开始
 ├── IMAGE_GENERATOR_MIGRATION.md   # 技术移植文档
-### 已实现功能
-- [x] 基础 WebView 集成
-- [x] shared_core 脚本注入
-- [x] 内置设置面板
-- [x] 本地设置存储
-- [x] 所有核心计算功能
-- [x] Android 支持
-- [x] iOS 支持
-- [x] **B30/R10 图片生成** ✨新
-- [x] **自动数据提取** ✨新
-- [x] **即时分享功能** ✨新
-
-### 计划功能
-- [ ] 应用内更新数据文件
-- [ ] 自定义主题色
-- [ ] 离线模式（缓存页面）
-- [ ] 多账号切换
-- [ ] 推分目标跟踪
-- [ ] 成绩历史记录
-- [ ] 导出成绩报告
-- [ ] 图片模板自定义
-- [ ] 离线曲绘缓存
-### 计划功能
-- [ ] 应用内更新数据文件
-- [ ] 自定义主题色
-- [ ] 离线模式（缓存页面）
-- [ ] 多账号切换
-- [ ] 推分目标跟踪
-- [ ] 成绩历史记录
-- [ ] 导出成绩报告
 
 ---
 

@@ -24,6 +24,7 @@ class ScoreFetchService {
   final List<String> _difficulties = ['PST', 'PRS', 'FTR', 'ETR', 'BYD'];
   bool _isUpdateMode = false;
   Set<String> _existingDates = {};
+  double? _latestPlayerPTT;
 
   /// 开始增量更新成绩
   /// 只拉取新成绩，遇到已有日期的成绩时停止
@@ -293,12 +294,24 @@ class ScoreFetchService {
               final parseScript = _getParseScript(difficulty);
               final result = await controller.evaluateJavascript(source: parseScript);
               
-              if (result != null && result is String && result.isNotEmpty) {
-                try {
-                  final data = jsonDecode(result);
-                  final scores = (data['scores'] as List<dynamic>)
-                      .map((e) => ScoreData.fromJson(e as Map<String, dynamic>))
-                      .toList();
+                  if (result != null && result is String && result.isNotEmpty) {
+                    try {
+                      final data = jsonDecode(result);
+                      final playerPTTValue = data['playerPTT'];
+                      double? parsedPTT;
+                      if (playerPTTValue is num) {
+                        parsedPTT = playerPTTValue.toDouble();
+                      } else if (playerPTTValue is String) {
+                        parsedPTT = double.tryParse(playerPTTValue);
+                      }
+
+                      if (parsedPTT != null && _latestPlayerPTT != parsedPTT) {
+                        _latestPlayerPTT = parsedPTT;
+                        await _storageService.savePlayerPTT(parsedPTT);
+                      }
+                      final scores = (data['scores'] as List<dynamic>)
+                          .map((e) => ScoreData.fromJson(e as Map<String, dynamic>))
+                          .toList();
                   
                   print('[ScoreFetch] 第 $currentPage 页解析到 ${scores.length} 条成绩');
                   
@@ -351,6 +364,7 @@ class ScoreFetchService {
                     scores: List.from(_allScores)..addAll(allDifficultyScores),
                     currentPage: currentPage,
                     hasNextPage: data['hasNextPage'] as bool,
+                    playerPTT: _latestPlayerPTT,
                   ));
                   
                   hasMore = data['hasNextPage'] as bool;
@@ -611,6 +625,16 @@ class ScoreFetchService {
     
     console.log('[解析] 总共解析了 ' + scores.length + ' 个成绩');
     
+    let playerPTT = null;
+    const pttElement = document.querySelector('.ptt, [class*="ptt"]');
+    if (pttElement) {
+      const text = pttElement.textContent.trim().replace(/,/g, '');
+      const match = text.match(/([\d.]+)/);
+      if (match && match[1]) {
+        playerPTT = parseFloat(match[1]);
+      }
+    }
+    
     // 检查是否有下一页按钮
     let hasNextPage = false;
     
@@ -666,7 +690,8 @@ class ScoreFetchService {
     const result = {
       scores: scores,
       currentPage: 1,
-      hasNextPage: hasNextPage
+      hasNextPage: hasNextPage,
+      playerPTT: playerPTT
     };
     
     console.log('[解析] 返回结果，成绩数: ' + scores.length + ', hasNextPage: ' + hasNextPage);

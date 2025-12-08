@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/score_data.dart';
+import '../models/score_sort_option.dart';
 
 /// 成绩存储服务
 /// 负责成绩数据的本地持久化
@@ -8,6 +9,8 @@ class ScoreStorageService {
   static const String _scoresKey = 'cached_scores';
   static const String _lastUpdateKey = 'scores_last_update';
   static const String _totalCountKey = 'scores_total_count';
+  static const String _playerPTTKey = 'scores_player_ptt';
+  static const String _sortOptionKey = 'score_sort_option';
 
   /// 保存成绩列表
   Future<void> saveScores(List<ScoreData> scores) async {
@@ -88,6 +91,7 @@ class ScoreStorageService {
       await prefs.remove(_scoresKey);
       await prefs.remove(_lastUpdateKey);
       await prefs.remove(_totalCountKey);
+      await prefs.remove(_playerPTTKey);
       
       print('[ScoreStorage] 缓存已清除');
     } catch (e) {
@@ -131,6 +135,54 @@ class ScoreStorageService {
       return prefs.containsKey(_scoresKey);
     } catch (e) {
       return false;
+    }
+  }
+
+  /// 保存最近一次获取到的总PTT
+  Future<void> savePlayerPTT(double? ptt) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (ptt == null) {
+      await prefs.remove(_playerPTTKey);
+    } else {
+      await prefs.setDouble(_playerPTTKey, ptt);
+    }
+  }
+
+  /// 读取缓存的总PTT
+  Future<double?> getPlayerPTT() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getDouble(_playerPTTKey);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// 保存排序选项
+  Future<void> saveSortOption(ScoreSortOption option) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_sortOptionKey, option.name);
+      print('[ScoreStorage] 已保存排序选项: ${option.label}');
+    } catch (e) {
+      print('[ScoreStorage] 保存排序选项失败: $e');
+    }
+  }
+
+  /// 加载排序选项
+  Future<ScoreSortOption> loadSortOption() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final optionName = prefs.getString(_sortOptionKey);
+      
+      if (optionName == null) {
+        return ScoreSortOption.dateDescending; // 默认按日期倒序
+      }
+      
+      return ScoreSortOption.fromString(optionName);
+    } catch (e) {
+      print('[ScoreStorage] 加载排序选项失败: $e');
+      return ScoreSortOption.dateDescending;
     }
   }
 }

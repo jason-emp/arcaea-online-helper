@@ -18,12 +18,14 @@ class DataUpdateResult {
 }
 
 /// 数据更新服务
-/// 从GitHub下载最新的Songlist.json和ChartConstant.json
+/// 从GitHub下载最新的Songlist.json、ChartConstant.json和chart-data.json
 class DataUpdateService {
   static const String _songlistUrl =
       'https://raw.githubusercontent.com/DarrenDanielDay/arcaea-toolbelt-data/main/src/data/songlist.json';
   static const String _chartConstantUrl =
       'https://raw.githubusercontent.com/DarrenDanielDay/arcaea-toolbelt-data/main/src/data/ChartConstant.json';
+  static const String _chartDataUrl =
+      'https://raw.githubusercontent.com/DarrenDanielDay/arcaea-toolbelt-data/main/src/data/chart-data.json';
 
   /// 更新所有数据文件
   Future<DataUpdateResult> updateAllData() async {
@@ -60,6 +62,19 @@ class DataUpdateService {
         return DataUpdateResult(
           success: false,
           message: '下载 ChartConstant.json 失败',
+        );
+      }
+
+      // 下载并保存chart-data.json
+      final chartDataResult = await _downloadFile(
+        _chartDataUrl,
+        '${dataDir.path}/chart-data.json',
+      );
+      
+      if (!chartDataResult) {
+        return DataUpdateResult(
+          success: false,
+          message: '下载 chart-data.json 失败',
         );
       }
 
@@ -148,8 +163,11 @@ class DataUpdateService {
       final directory = await getApplicationDocumentsDirectory();
       final songlistFile = File('${directory.path}/arcaea_data/Songlist.json');
       final chartFile = File('${directory.path}/arcaea_data/ChartConstant.json');
+      final chartDataFile = File('${directory.path}/arcaea_data/chart-data.json');
       
-      return await songlistFile.exists() && await chartFile.exists();
+      return await songlistFile.exists() && 
+             await chartFile.exists() && 
+             await chartDataFile.exists();
     } catch (e) {
       return false;
     }
