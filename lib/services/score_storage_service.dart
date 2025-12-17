@@ -17,20 +17,49 @@ class ScoreStorageService {
     try {
       final prefs = await SharedPreferences.getInstance();
       
+      // 保存前先去重，确保同一曲目同一难度只保留最高分
+      final deduplicatedScores = _deduplicateScores(scores);
+      
       // 将成绩列表转换为JSON
-      final scoresJson = scores.map((s) => s.toJson()).toList();
+      final scoresJson = deduplicatedScores.map((s) => s.toJson()).toList();
       final jsonString = jsonEncode(scoresJson);
       
       // 保存到SharedPreferences
       await prefs.setString(_scoresKey, jsonString);
       await prefs.setString(_lastUpdateKey, DateTime.now().toIso8601String());
-      await prefs.setInt(_totalCountKey, scores.length);
+      await prefs.setInt(_totalCountKey, deduplicatedScores.length);
       
-      print('[ScoreStorage] 已保存 ${scores.length} 条成绩');
+      print('[ScoreStorage] 已保存 ${deduplicatedScores.length} 条成绩');
     } catch (e) {
       print('[ScoreStorage] 保存失败: $e');
       rethrow;
     }
+  }
+
+  /// 成绩去重
+  /// 去重规则：相同歌曲标题 + 相同难度，只保留分数最高的
+  List<ScoreData> _deduplicateScores(List<ScoreData> scores) {
+    final Map<String, ScoreData> scoreMap = {};
+    
+    for (var score in scores) {
+      // 生成唯一键：歌曲标题_难度
+      final key = '${score.songTitle}_${score.difficulty}';
+      
+      // 如果key已存在，比较分数，保留分数更高的
+      if (scoreMap.containsKey(key)) {
+        final existing = scoreMap[key]!;
+        if (score.score > existing.score) {
+          // 新成绩分数更高，替换旧成绩
+          scoreMap[key] = score;
+        }
+        // 否则保留现有的（分数更高或相等）
+      } else {
+        // 首次遇到该曲目+难度，直接添加
+        scoreMap[key] = score;
+      }
+    }
+    
+    return scoreMap.values.toList();
   }
 
   /// 加载成绩列表
@@ -105,17 +134,29 @@ class ScoreStorageService {
     try {
       final existingScores = await loadScores();
       
-      // 合并去重（基于歌曲标题、难度、分数和日期）
+      // 合并去重（基于歌曲标题 + 难度，保留分数最高的）
       final Map<String, ScoreData> scoreMap = {};
       
+      // 先添加现有成绩
       for (var score in existingScores) {
-        final key = '${score.songTitle}_${score.difficulty}_${score.score}_${score.obtainedDate}';
+        final key = '${score.songTitle}_${score.difficulty}';
         scoreMap[key] = score;
       }
       
+      // 再添加新成绩，如果遇到相同曲目+难度，比较分数并保留更高的
       for (var score in newScores) {
-        final key = '${score.songTitle}_${score.difficulty}_${score.score}_${score.obtainedDate}';
-        scoreMap[key] = score;
+        final key = '${score.songTitle}_${score.difficulty}';
+        if (scoreMap.containsKey(key)) {
+          final existing = scoreMap[key]!;
+          if (score.score > existing.score) {
+            // 新成绩分数更高，替换
+            scoreMap[key] = score;
+          }
+          // 否则保留现有的
+        } else {
+          // 首次遇到该曲目+难度
+          scoreMap[key] = score;
+        }
       }
       
       final mergedScores = scoreMap.values.toList();

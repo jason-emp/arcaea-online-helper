@@ -161,27 +161,31 @@ class ScoreFetchService {
   }
 
   /// 成绩去重
-  /// 去重规则：歌曲标题 + 难度 + 分数 + 取得日期 完全相同则认为是重复
+  /// 去重规则：相同歌曲标题 + 相同难度，只保留分数最高的
   List<ScoreData> _deduplicateScores(List<ScoreData> scores) {
     final Map<String, ScoreData> scoreMap = {};
     
     for (var score in scores) {
-      // 生成唯一键：歌曲标题_难度_分数_日期
-      final key = '${score.songTitle}_${score.difficulty}_${score.score}_${score.obtainedDate}';
+      // 生成唯一键：歌曲标题_难度
+      final key = '${score.songTitle}_${score.difficulty}';
       
-      // 如果key已存在，保留分数更高的那个（或者保留最新的）
+      // 如果key已存在，比较分数，保留分数更高的
       if (scoreMap.containsKey(key)) {
-        // 这里可以添加更复杂的逻辑，比如保留分数更高的
-        // 但按照去重规则，分数和日期都相同，所以直接跳过即可
-        continue;
+        final existing = scoreMap[key]!;
+        if (score.score > existing.score) {
+          // 新成绩分数更高，替换旧成绩
+          scoreMap[key] = score;
+        }
+        // 否则保留现有的（分数更高或相等）
+      } else {
+        // 首次遇到该曲目+难度，直接添加
+        scoreMap[key] = score;
       }
-      
-      scoreMap[key] = score;
     }
     
     final deduplicated = scoreMap.values.toList();
     if (deduplicated.length < scores.length) {
-      print('[ScoreFetch] 去重：${scores.length} 条 -> ${deduplicated.length} 条（移除 ${scores.length - deduplicated.length} 条重复）');
+      print('[ScoreFetch] 去重：${scores.length} 条 -> ${deduplicated.length} 条（移除 ${scores.length - deduplicated.length} 条重复，保留最高分）');
     }
     
     return deduplicated;

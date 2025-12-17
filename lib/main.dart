@@ -67,6 +67,13 @@ class _MainTabPageState extends State<MainTabPage> {
   final GlobalKey<_ArcaeaWebViewPageState> _webViewKey = GlobalKey();
   bool _lastLoginState = false;
   bool _showWebView = false; // 控制是否显示 WebView
+  late final ImageGenerationManager _imageManager;
+
+  @override
+  void initState() {
+    super.initState();
+    _imageManager = ImageGenerationManager();
+  }
 
   void _navigateToWebView() {
     setState(() {
@@ -157,13 +164,13 @@ class _MainTabPageState extends State<MainTabPage> {
     // 根据是否显示 WebView 决定页面列表和索引映射
     final webViewState = _webViewKey.currentState;
     final scoreListPage = ScoreListPage(
-      imageManager: webViewState?._imageManager,
+      imageManager: _imageManager,
     );
 
     final List<Widget> pages = _showWebView
         ? [
             B30R10Page(
-              imageManager: webViewState?._imageManager ?? ImageGenerationManager(),
+              imageManager: _imageManager,
               isLoggedIn: isLoggedIn,
               onNavigateToWebView: _navigateToWebView,
               onRefreshData: _refreshData,
@@ -173,7 +180,7 @@ class _MainTabPageState extends State<MainTabPage> {
               onCheckUpdate: _checkUpdate,
               onUpdateData: _updateData,
               isCheckingUpdate: webViewState?._isCheckingUpdate ?? false,
-              isGeneratingImage: webViewState?._imageManager.isGenerating ?? false,
+              isGeneratingImage: _imageManager.isGenerating,
               isUpdatingData: webViewState?._isUpdatingData ?? false,
               currentVersion: webViewState?._currentVersion,
               latestVersion: webViewState?._latestAvailableVersion,
@@ -181,12 +188,12 @@ class _MainTabPageState extends State<MainTabPage> {
               dataUpdateMessage: webViewState?._dataUpdateMessage,
               lastDataUpdateTime: webViewState?._lastDataUpdateTime,
             ),
-            ArcaeaWebViewPage(key: _webViewKey),
+            ArcaeaWebViewPage(key: _webViewKey, imageManager: _imageManager),
             scoreListPage,
           ]
         : [
             B30R10Page(
-              imageManager: webViewState?._imageManager ?? ImageGenerationManager(),
+              imageManager: _imageManager,
               isLoggedIn: isLoggedIn,
               onNavigateToWebView: _navigateToWebView,
               onRefreshData: _refreshData,
@@ -196,7 +203,7 @@ class _MainTabPageState extends State<MainTabPage> {
               onCheckUpdate: _checkUpdate,
               onUpdateData: _updateData,
               isCheckingUpdate: webViewState?._isCheckingUpdate ?? false,
-              isGeneratingImage: webViewState?._imageManager.isGenerating ?? false,
+              isGeneratingImage: _imageManager.isGenerating,
               isUpdatingData: webViewState?._isUpdatingData ?? false,
               currentVersion: webViewState?._currentVersion,
               latestVersion: webViewState?._latestAvailableVersion,
@@ -205,7 +212,7 @@ class _MainTabPageState extends State<MainTabPage> {
               lastDataUpdateTime: webViewState?._lastDataUpdateTime,
             ),
             scoreListPage,
-            ArcaeaWebViewPage(key: _webViewKey), // 保持在列表中以维持状态
+            ArcaeaWebViewPage(key: _webViewKey, imageManager: _imageManager), // 保持在列表中以维持状态
           ];
     
     // 当不显示 WebView 时，调整索引映射
@@ -274,7 +281,9 @@ class _MainTabPageState extends State<MainTabPage> {
 }
 
 class ArcaeaWebViewPage extends StatefulWidget {
-  const ArcaeaWebViewPage({super.key});
+  final ImageGenerationManager imageManager;
+  
+  const ArcaeaWebViewPage({super.key, required this.imageManager});
 
   @override
   State<ArcaeaWebViewPage> createState() => _ArcaeaWebViewPageState();
@@ -290,7 +299,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
 
   // 服务和管理器
   late final WebViewScriptManager _scriptManager;
-  late final ImageGenerationManager _imageManager;
+  ImageGenerationManager get _imageManager => widget.imageManager;
   late final UpdateService _updateService;
   late final DataUpdateService _dataUpdateService;
 
@@ -316,7 +325,6 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     // 初始化服务和管理器
     _updateService = UpdateService();
     _dataUpdateService = DataUpdateService();
-    _imageManager = ImageGenerationManager();
     _scriptManager = WebViewScriptManager(
       onB30R10DataReceived: _handleB30R10Data,
       onDebugMessage: (message) => debugPrint('[ScriptManager] $message'),
@@ -505,7 +513,8 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
 
   void _handleB30R10Data(B30R10Data data) {
     _imageManager.cachedData = data;
-    debugPrint('[Arcaea Helper] 数据已缓存: ${data.player.username}');
+    debugPrint('[Arcaea Helper] 数据已缓存: ${data.player.username}, ImageManager实例: ${_imageManager.hashCode}');
+    debugPrint('[Arcaea Helper] 验证缓存: ${_imageManager.cachedData != null ? _imageManager.cachedData!.player.username : "null"}');
 
     if (mounted) {
       _showSnackBar('数据已准备: ${data.player.username}');

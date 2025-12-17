@@ -383,13 +383,20 @@ class _ScoreListPageState extends State<ScoreListPage> {
         // 按日期倒序（最新在前）
         sorted.sort((a, b) {
           try {
-            // 日期格式: YYYY/(M)M/DD hh:mm
-            final dateA = DateFormat('yyyy/M/d HH:mm').parse(a.obtainedDate);
-            final dateB = DateFormat('yyyy/M/d HH:mm').parse(b.obtainedDate);
+            // 日期格式: M/D/YYYY HH:mm
+            final dateA = DateFormat('M/d/yyyy HH:mm').parse(a.obtainedDate);
+            final dateB = DateFormat('M/d/yyyy HH:mm').parse(b.obtainedDate);
             return dateB.compareTo(dateA);
           } catch (e) {
-            // 如果解析失败，使用字符串比较作为后备方案
-            return b.obtainedDate.compareTo(a.obtainedDate);
+            // 如果解析失败，尝试使用 yyyy/M/d 格式
+            try {
+              final dateA = DateFormat('yyyy/M/d HH:mm').parse(a.obtainedDate);
+              final dateB = DateFormat('yyyy/M/d HH:mm').parse(b.obtainedDate);
+              return dateB.compareTo(dateA);
+            } catch (e2) {
+              // 最后才使用字符串比较作为后备方案
+              return b.obtainedDate.compareTo(a.obtainedDate);
+            }
           }
         });
         break;
