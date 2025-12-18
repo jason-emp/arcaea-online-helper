@@ -184,37 +184,90 @@
     try {
       let title = null;
       let score = null;
+      let titleElement = null;
 
-      const noOverflowSpans = cardElement.querySelectorAll('span.no-overflow');
+      // 1. 提取标题 - 增加更多可能的选择器
+      const titleSelectors = [
+        'span.no-overflow',
+        '.title .no-overflow',
+        '.title span',
+        '.song-title',
+        '.song-name',
+        '.name',
+        '[class*="title"]',
+        '[class*="name"]'
+      ];
       
-      if (noOverflowSpans.length > 0) {
-        title = noOverflowSpans[0].textContent.trim();
-        if (title && title !== 'Title') {
-          title = title.replace(/\s*\([\d.]+\)\s*$/, '').trim();
-        } else {
-          title = null;
-        }
-      }
-      
-      const exMainElements = cardElement.querySelectorAll('.ex-main, [class*="ex-main"]');
-      for (const exMain of exMainElements) {
-        const text = exMain.textContent.trim();
-        const scoreMatch = text.match(/([\d,]+)/);
-        if (scoreMatch) {
-          const scoreStr = scoreMatch[1].replace(/,/g, '');
-          const scoreNum = parseInt(scoreStr, 10);
-          if (!isNaN(scoreNum) && scoreNum >= 0 && scoreNum <= 10000000) {
-            score = scoreNum;
+      for (const selector of titleSelectors) {
+        const elements = cardElement.querySelectorAll(selector);
+        for (const el of elements) {
+          const text = el.textContent.trim();
+          // 排除掉一些明显的干扰项
+          if (text.length > 0 && 
+              text.length < 60 && 
+              text !== 'Title' && 
+              text !== '标题' &&
+              !text.match(/^\d+$/) &&
+              !text.includes('潜力值') &&
+              !text.includes('所需最低')) {
+            title = text.replace(/\s*\([\d.]+\)\s*$/, '').trim();
+            titleElement = el;
             break;
+          }
+        }
+        if (title) break;
+      }
+
+      // 2. 提取分数 - 采用更激进的扫描策略
+      // 优先尝试标准类名
+      const scoreElements = cardElement.querySelectorAll('.ex-main, [class*="ex-main"], .score, [class*="score"]');
+      let potentialScores = [];
+      
+      for (const el of scoreElements) {
+        const text = el.textContent.trim();
+        const match = text.match(/(\d{1,3}(,\d{3})*|\d{7,8})/);
+        if (match) {
+          const num = parseInt(match[0].replace(/,/g, ''), 10);
+          if (num >= 5000000 && num <= 10002000) {
+            potentialScores.push(num);
           }
         }
       }
       
-      return { title, score };
+      // 如果没找到，扫描所有文本节点
+      if (potentialScores.length === 0) {
+        const walker = document.createTreeWalker(cardElement, NodeFilter.SHOW_TEXT, null, false);
+        let node;
+        while (node = walker.nextNode()) {
+          const text = node.textContent.trim();
+          // 排除日期格式
+          if (text.includes('/') || text.includes(':')) continue;
+          
+          const match = text.match(/(\d{1,3}(,\d{3})*|\d{7,8})/);
+          if (match) {
+            const num = parseInt(match[0].replace(/,/g, ''), 10);
+            if (num >= 5000000 && num <= 10002000) {
+              potentialScores.push(num);
+            }
+          }
+        }
+      }
+      
+      if (potentialScores.length > 0) {
+        // 取最大的那个数字作为分数（防止误抓到连击数等）
+        score = Math.max(...potentialScores);
+      }
+      
+      // 特殊调试日志
+      if (title && title.toUpperCase().includes('NULL')) {
+        console.log(`[Arcaea Helper] 识别到特殊歌曲: "${title}", 分数: ${score}`);
+      }
+      
+      return { title, score, titleElement };
     } catch (error) {
       console.error('[Arcaea Helper] 获取歌曲信息失败:', error);
     }
-    return { title: null, score: null };
+    return { title: null, score: null, titleElement: null };
   }
 
   function addChartConstantAndPTT(titleElement, constant, score = null) {
@@ -352,21 +405,30 @@
     }
   }
 
+  // 检查是否为真正的歌曲卡片
+  function isSongCard(cardElement) {
+    const text = cardElement.innerText || "";
+    // 歌曲卡片必须包含难度标识
+    const hasDifficulty = /FTR|BYD|PRS|PST|ETR|FUTURE|BEYOND|PRESENT|PAST|ETERNAL/i.test(text);
+    // 歌曲卡片必须包含分数格式 (7-8位数字，可能带逗号)
+    const hasScore = /\d{1,3}(,\d{3}){2}/.test(text) || /\d{7,8}/.test(text);
+    return hasDifficulty && hasScore && text.length > 20;
+  }
+
   function processCard(cardElement, index = null, isRecent = false, totalPTT = null) {
     if (cardElement.classList.contains('arcaea-processed')) {
-      const pttElement = cardElement.querySelector('.arcaea-play-ptt');
-      if (pttElement) {
-        const pttText = pttElement.textContent.trim();
-        const pttValue = parseFloat(pttText);
-        return isNaN(pttValue) ? null : pttValue;
-      }
-      return null;
+      return cardElement._arcaeaPlayPTT || null;
     }
     if (processedElements.has(cardElement)) return null;
 
     try {
-      const { title: songTitle, score } = getSongTitleAndScoreFromCard(cardElement);
-      if (!songTitle) return null;
+      const { title: songTitle, score, titleElement } = getSongTitleAndScoreFromCard(cardElement);
+      if (!songTitle || score === null) {
+        if (songTitle && score === null) {
+          console.log(`[Arcaea Helper] 跳过歌曲 (无分数): ${songTitle}`);
+        }
+        return null;
+      }
 
       const difficulty = getDifficultyFromElement(cardElement);
       if (difficulty === null) return null;
@@ -374,23 +436,18 @@
       const constant = dataLoader.getChartConstant(songTitle, difficulty, false);
       if (constant === null) return null;
 
-      const titleElement = Array.from(cardElement.querySelectorAll('span'))
-        .find(el => el.textContent?.trim() === songTitle);
-      
-      let playPTT = null;
+      // 存储数据供第二轮使用
+      cardElement._arcaeaTitle = songTitle;
+      cardElement._arcaeaScore = score;
+      cardElement._arcaeaConstant = constant;
+
+      let playPTT = window.ArcaeaCalculator.calculatePlayPTT(score, constant);
+      cardElement._arcaeaPlayPTT = playPTT;
+
       if (titleElement) {
         addChartConstantAndPTT(titleElement, constant, score);
-        if (score !== null) {
-          playPTT = window.ArcaeaCalculator.calculatePlayPTT(score, constant);
-          
-          // 如果有总PTT，添加目标分数
-          if (totalPTT !== null) {
-            addTargetScore(cardElement, constant, score, totalPTT);
-          }
-        }
       }
 
-      // 添加序号
       if (index !== null) {
         addCardIndex(cardElement, index, isRecent);
       }
@@ -401,6 +458,82 @@
     } catch (error) {
       console.error('[Arcaea Helper] 处理卡片失败:', error);
       return null;
+    }
+  }
+
+  function processAllCards() {
+    try {
+      const cardLists = document.querySelectorAll('.card-list, [class*="card-list"]');
+      const best30PTTs = [];
+      const recent10PTTs = [];
+
+      cardLists.forEach((cardList) => {
+        const allElements = Array.from(cardList.querySelectorAll('[data-v-b3942f14].card'));
+        const songCards = allElements.filter(isSongCard);
+
+        console.log(`[Arcaea Helper] 页面卡片总数: ${allElements.length}, 识别为歌曲数: ${songCards.length}`);
+
+        // 调试：打印前若干张卡片的判定细节
+        const sampleCount = Math.min(12, allElements.length);
+        for (let i = 0; i < sampleCount; i++) {
+          const card = allElements[i];
+          const text = card.innerText || '';
+          const hasDifficulty = /FTR|BYD|PRS|PST|ETR|FUTURE|BEYOND|PRESENT|PAST|ETERNAL/i.test(text);
+          const hasScore = /\d{1,3}(,\d{3}){2}/.test(text) || /\d{7,8}/.test(text);
+          const head = text.replace(/\s+/g, ' ').slice(0, 120);
+          console.log(`[Arcaea Helper][Card#${i + 1}] isSongCard=${hasDifficulty && hasScore} hasDiff=${hasDifficulty} hasScore=${hasScore} text="${head}${text.length > 120 ? '…' : ''}"`);
+        }
+
+        songCards.forEach((card, idx) => {
+          if (best30PTTs.length < 30) {
+            const ptt = processCard(card, best30PTTs.length + 1, false, null);
+            if (ptt !== null) {
+              best30PTTs.push(ptt);
+            } else {
+              console.log(`[Arcaea Helper] 歌曲卡片处理失败: idx=${idx + 1} 目标=B${best30PTTs.length + 1}`);
+            }
+          } else if (recent10PTTs.length < 10) {
+            const ptt = processCard(card, recent10PTTs.length + 1, true, null);
+            if (ptt !== null) {
+              recent10PTTs.push(ptt);
+            } else {
+              console.log(`[Arcaea Helper] 歌曲卡片处理失败: idx=${idx + 1} 目标=R${recent10PTTs.length + 1}`);
+            }
+          }
+        });
+
+        addSectionDivider(cardList);
+      });
+      
+      if (best30PTTs.length > 0 || recent10PTTs.length > 0) {
+        const best30Sum = best30PTTs.reduce((sum, ptt) => sum + ptt, 0);
+        const recent10Sum = recent10PTTs.reduce((sum, ptt) => sum + ptt, 0);
+        const totalPTT = (best30Sum + recent10Sum) / 40;
+        
+        const best30Avg = best30PTTs.length > 0 ? best30Sum / best30PTTs.length : 0;
+        const recent10Avg = recent10PTTs.length > 0 ? recent10Sum / recent10PTTs.length : 0;
+        
+        console.log(`[Arcaea Helper] Best 30: ${best30PTTs.length}首, Recent 10: ${recent10PTTs.length}首, 总PTT: ${totalPTT.toFixed(4)}`);
+        
+        displayTotalPTT(totalPTT, best30PTTs, recent10PTTs);
+        insertPTTIncreaseCard(totalPTT, best30PTTs, recent10PTTs);
+        addB30R10InfoToFirstCard(best30Avg, recent10Avg);
+        
+        // 第二轮：添加目标分数
+        cardLists.forEach((cardList) => {
+          const songCards = Array.from(cardList.querySelectorAll('[data-v-b3942f14].card')).filter(isSongCard);
+          songCards.forEach((card) => {
+            if (card.querySelector('.arcaea-target-score')) return;
+            if (card._arcaeaConstant && card._arcaeaScore) {
+              addTargetScore(card, card._arcaeaConstant, card._arcaeaScore, totalPTT);
+            }
+          });
+        });
+        
+        console.log('[Arcaea Helper] ✅ 所有卡片处理完成');
+      }
+    } catch (error) {
+      console.error('[Arcaea Helper] 处理过程出错:', error);
     }
   }
 
@@ -547,16 +680,44 @@
       
       // 第一轮：收集PTT数据
       cardLists.forEach((cardList) => {
-        const allElements = cardList.querySelectorAll('[data-v-b3942f14].card');
-        console.log(`[Arcaea Helper] 找到 ${allElements.length} 个卡片`);
+        const allElements = Array.from(cardList.querySelectorAll('[data-v-b3942f14].card'));
         
-        allElements.forEach((card, cardIndex) => {
-          if (cardIndex < 30) {
-            const ptt = processCard(card, cardIndex + 1, false, null);
-            if (ptt !== null) best30PTTs.push(ptt);
-          } else if (cardIndex < 40) {
-            const ptt = processCard(card, cardIndex - 29, true, null);
-            if (ptt !== null) recent10PTTs.push(ptt);
+        // 过滤掉非歌曲卡片（如顶部的 PTT 变动卡片）
+        const songCards = allElements.filter((card, idx) => {
+          const text = card.innerText || "";
+          const isPttCard = (text.includes('潜力值') || text.includes('Potential')) && 
+                            (text.includes('+') || text.includes('-') || text.includes('标题'));
+          
+          if (isPttCard) {
+            console.log(`[Arcaea Helper] 过滤掉第 ${idx + 1} 个卡片 (判定为 PTT 变动卡片)`);
+          }
+          return !isPttCard;
+        });
+
+        console.log(`[Arcaea Helper] 原始卡片数: ${allElements.length}, 过滤后歌曲卡片数: ${songCards.length}`);
+        
+        // 如果过滤后数量不对，尝试不进行过滤，但确保 processCard 能识别并跳过无效卡片
+        const cardsToProcess = songCards.length >= 40 ? songCards : allElements;
+        if (cardsToProcess === allElements && songCards.length < 40) {
+          console.log('[Arcaea Helper] 过滤后歌曲不足 40，回退到处理所有原始卡片');
+        }
+        
+        cardsToProcess.forEach((card, cardIndex) => {
+          // 限制只处理前40个有效卡片
+          if (best30PTTs.length < 30) {
+            const ptt = processCard(card, best30PTTs.length + 1, false, null);
+            if (ptt !== null) {
+              best30PTTs.push(ptt);
+            } else {
+              console.log(`[Arcaea Helper] 第 ${cardIndex + 1} 个卡片处理返回 null (目标 B${best30PTTs.length + 1})`);
+            }
+          } else if (recent10PTTs.length < 10) {
+            const ptt = processCard(card, recent10PTTs.length + 1, true, null);
+            if (ptt !== null) {
+              recent10PTTs.push(ptt);
+            } else {
+              console.log(`[Arcaea Helper] 第 ${cardIndex + 1} 个卡片处理返回 null (目标 R${recent10PTTs.length + 1})`);
+            }
           }
         });
         
@@ -588,8 +749,13 @@
         
         // 第二轮：添加目标分数
         cardLists.forEach((cardList) => {
-          const allElements = cardList.querySelectorAll('[data-v-b3942f14].card');
-          allElements.forEach((card) => {
+          const allElements = Array.from(cardList.querySelectorAll('[data-v-b3942f14].card'));
+          const songCards = allElements.filter(card => {
+            const text = card.innerText || "";
+            return !((text.includes('潜力值') || text.includes('Potential')) && (text.includes('+') || text.includes('-')));
+          });
+
+          songCards.forEach((card) => {
             if (card.querySelector('.arcaea-target-score')) return;
             
             const { title, score } = getSongTitleAndScoreFromCard(card);
@@ -732,16 +898,23 @@
       const allCards = [];
 
       // 收集所有卡片
+      let totalCardsProcessed = 0;
+      let cardsSkipped = 0;
+      
       cardLists.forEach((cardList, listIndex) => {
         const cards = cardList.querySelectorAll('[data-v-b3942f14].card');
         console.log(`[Arcaea Helper] 列表 ${listIndex}: 找到 ${cards.length} 张卡片`);
 
         cards.forEach((cardElement, cardIndex) => {
+          totalCardsProcessed++;
           const { title, score } = getSongTitleAndScoreFromCard(cardElement);
           const difficulty = getDifficultyFromElement(cardElement);
 
           if (!title || score === null || difficulty === null) {
-            console.warn(`[Arcaea Helper] 跳过不完整的卡片 ${cardIndex}`);
+            cardsSkipped++;
+            console.warn(`[Arcaea Helper] 跳过不完整的卡片 ${cardIndex}/${totalCardsProcessed}: title="${title}", score=${score}, difficulty=${difficulty}`);
+            // 输出卡片的HTML结构用于调试
+            console.log('[Arcaea Helper] 卡片HTML:', cardElement.outerHTML.substring(0, 500));
             return;
           }
 
@@ -808,6 +981,8 @@
           allCards.push(cardData);
         });
       });
+
+      console.log(`[Arcaea Helper] 导出统计: 处理了 ${totalCardsProcessed} 张卡片, 跳过了 ${cardsSkipped} 张, 成功收集 ${allCards.length} 张`);
 
       // 分割为Best 30和Recent 10
       // 前30张是Best 30，后面的是Recent 10
