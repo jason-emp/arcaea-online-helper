@@ -685,17 +685,48 @@ class _ScoreListPageState extends State<ScoreListPage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const LinearProgressIndicator(),
+              StreamBuilder<double>(
+                stream: _fetchService.progressStream,
+                builder: (context, snapshot) {
+                  final progress = snapshot.data;
+                  return Column(
+                    children: [
+                      LinearProgressIndicator(
+                        value: (progress != null && progress >= 0)
+                            ? progress
+                            : null,
+                      ),
+                      if (progress != null && progress >= 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            '${(progress * 100).toStringAsFixed(0)}%',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
               const SizedBox(height: 16),
               StreamBuilder<String>(
                 stream: _fetchService.difficultyStream,
                 builder: (context, snapshot) {
                   final difficulty = snapshot.data ?? '';
-                  return Text(
-                    difficulty.isNotEmpty
-                        ? '正在拉取 $difficulty 难度第 $_currentPage 页...'
-                        : '准备中...',
-                    textAlign: TextAlign.center,
+                  return StreamBuilder<ScoreListResponse>(
+                    stream: _fetchService.scoreStream,
+                    builder: (context, scoreSnapshot) {
+                      final page = scoreSnapshot.data?.currentPage ?? 1;
+                      return Text(
+                        difficulty.isNotEmpty
+                            ? '正在拉取 $difficulty 难度第 $page 页...'
+                            : '准备中...',
+                        textAlign: TextAlign.center,
+                      );
+                    },
                   );
                 },
               ),
