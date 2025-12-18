@@ -16,8 +16,9 @@ import 'score_filter_dialog.dart';
 /// 成绩列表页面
 class ScoreListPage extends StatefulWidget {
   final ImageGenerationManager? imageManager;
+  final bool isActive;
 
-  const ScoreListPage({super.key, this.imageManager});
+  const ScoreListPage({super.key, this.imageManager, this.isActive = false});
 
   @override
   State<ScoreListPage> createState() => _ScoreListPageState();
@@ -54,6 +55,8 @@ class _ScoreListPageState extends State<ScoreListPage> {
   void initState() {
     super.initState();
     _attachImageManager(widget.imageManager);
+    // 初始进入时尝试从缓存加载 B30 数据
+    widget.imageManager?.loadFromCache();
     _setupListeners();
     _loadSongMetadata();
     _loadCachedScores();
@@ -89,6 +92,18 @@ class _ScoreListPageState extends State<ScoreListPage> {
     if (oldWidget.imageManager != widget.imageManager) {
       _detachImageManager();
       _attachImageManager(widget.imageManager);
+    }
+
+    // 每次页面变为活跃状态时，验证 B30 数据
+    if (widget.isActive && !oldWidget.isActive) {
+      _validateB30Data();
+    }
+  }
+
+  void _validateB30Data() {
+    if (_b30Data == null) {
+      debugPrint('[ScoreListPage] 页面激活，B30数据为空，尝试从缓存加载');
+      widget.imageManager?.loadFromCache();
     }
   }
 

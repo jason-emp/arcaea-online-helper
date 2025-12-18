@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/score_data.dart';
 import '../models/score_sort_option.dart';
+import '../models/b30r10_data.dart';
 
 /// 成绩存储服务
 /// 负责成绩数据的本地持久化
@@ -11,6 +12,7 @@ class ScoreStorageService {
   static const String _totalCountKey = 'scores_total_count';
   static const String _playerPTTKey = 'scores_player_ptt';
   static const String _sortOptionKey = 'score_sort_option';
+  static const String _b30DataKey = 'cached_b30_data';
 
   /// 保存成绩列表
   Future<void> saveScores(List<ScoreData> scores) async {
@@ -224,6 +226,36 @@ class ScoreStorageService {
     } catch (e) {
       print('[ScoreStorage] 加载排序选项失败: $e');
       return ScoreSortOption.dateDescending;
+    }
+  }
+
+  /// 保存B30/R10数据
+  Future<void> saveB30Data(B30R10Data data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = jsonEncode(data.toJson());
+      await prefs.setString(_b30DataKey, jsonString);
+      print('[ScoreStorage] 已保存 B30/R10 数据');
+    } catch (e) {
+      print('[ScoreStorage] 保存 B30/R10 数据失败: $e');
+    }
+  }
+
+  /// 加载B30/R10数据
+  Future<B30R10Data?> loadB30Data() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = prefs.getString(_b30DataKey);
+
+      if (jsonString == null || jsonString.isEmpty) {
+        return null;
+      }
+
+      final Map<String, dynamic> jsonData = jsonDecode(jsonString);
+      return B30R10Data.fromJson(jsonData);
+    } catch (e) {
+      print('[ScoreStorage] 加载 B30/R10 数据失败: $e');
+      return null;
     }
   }
 }

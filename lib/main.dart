@@ -73,6 +73,8 @@ class _MainTabPageState extends State<MainTabPage> {
   void initState() {
     super.initState();
     _imageManager = ImageGenerationManager();
+    // 启动时尝试从缓存加载 B30 数据
+    _imageManager.loadFromCache();
   }
 
   void _navigateToWebView() {
@@ -163,8 +165,11 @@ class _MainTabPageState extends State<MainTabPage> {
     
     // 根据是否显示 WebView 决定页面列表和索引映射
     final webViewState = _webViewKey.currentState;
+    final int displayIndex = _showWebView ? _currentIndex : (_currentIndex >= 2 ? 2 : _currentIndex);
+    
     final scoreListPage = ScoreListPage(
       imageManager: _imageManager,
+      isActive: (_showWebView && displayIndex == 2) || (!_showWebView && displayIndex == 1),
     );
 
     final List<Widget> pages = _showWebView
@@ -214,9 +219,6 @@ class _MainTabPageState extends State<MainTabPage> {
             scoreListPage,
             ArcaeaWebViewPage(key: _webViewKey, imageManager: _imageManager), // 保持在列表中以维持状态
           ];
-    
-    // 当不显示 WebView 时，调整索引映射
-    final int displayIndex = _showWebView ? _currentIndex : (_currentIndex >= 2 ? 2 : _currentIndex);
     
     return Scaffold(
       body: IndexedStack(

@@ -5,10 +5,12 @@ import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/b30r10_data.dart';
 import '../services/image_generator_service.dart';
+import '../services/score_storage_service.dart';
 import '../core/constants.dart';
 
 /// 图片生成管理器
 class ImageGenerationManager extends ChangeNotifier {
+  final ScoreStorageService _storageService = ScoreStorageService();
   bool _isGenerating = false;
   String _progress = '';
   B30R10Data? _cachedData;
@@ -19,7 +21,20 @@ class ImageGenerationManager extends ChangeNotifier {
 
   set cachedData(B30R10Data? data) {
     _cachedData = data;
+    if (data != null) {
+      _storageService.saveB30Data(data);
+    }
     notifyListeners();
+  }
+
+  /// 从缓存加载数据
+  Future<void> loadFromCache() async {
+    if (_cachedData != null) return;
+    final data = await _storageService.loadB30Data();
+    if (data != null) {
+      _cachedData = data;
+      notifyListeners();
+    }
   }
 
   /// 生成B30/R10图片
