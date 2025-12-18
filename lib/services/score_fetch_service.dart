@@ -3,16 +3,19 @@ import 'dart:convert';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../models/score_data.dart';
 import 'score_storage_service.dart';
+import 'song_data_service.dart';
 
 /// 成绩拉取服务
 /// 使用WebView从官网拉取成绩数据
 class ScoreFetchService {
   HeadlessInAppWebView? _headlessWebView;
-  final _scoreStreamController = StreamController<ScoreListResponse>.broadcast();
+  final _scoreStreamController =
+      StreamController<ScoreListResponse>.broadcast();
   final _errorStreamController = StreamController<String>.broadcast();
   final _progressStreamController = StreamController<double>.broadcast();
   final _difficultyStreamController = StreamController<String>.broadcast();
   final _storageService = ScoreStorageService();
+  final _songDataService = SongDataService();
 
   Stream<ScoreListResponse> get scoreStream => _scoreStreamController.stream;
   Stream<String> get errorStream => _errorStreamController.stream;
@@ -28,7 +31,8 @@ class ScoreFetchService {
 
   /// 开始增量更新成绩
   /// 只拉取新成绩，遇到已有日期的成绩时停止
-  Future<void> startUpdating() async {
+  /// [difficulties] 要更新的难度列表，如果为null则更新所有难度
+  Future<void> startUpdating({List<String>? difficulties}) async {
     if (_isFetching) {
       _errorStreamController.add('正在拉取中,请稍候');
       return;
@@ -36,42 +40,61 @@ class ScoreFetchService {
 
     _isFetching = true;
     _isUpdateMode = true;
-    
+
+    // 确保歌曲数据已加载
+    await _songDataService.ensureLoaded();
+
     // 加载已有成绩的日期集合
     final existingScores = await _storageService.loadScores();
     _existingDates = existingScores.map((s) => s.obtainedDate).toSet();
     print('[ScoreFetch] 增量更新模式，已有 ${_existingDates.length} 个不同的日期');
 
+    // 确定要更新的难度列表
+    final targetDifficulties = difficulties ?? _difficulties;
+    print('[ScoreFetch] 将更新以下难度: ${targetDifficulties.join(", ")}');
+
     try {
-      // 遍历所有难度
-      for (int diffIndex = 0; diffIndex < _difficulties.length; diffIndex++) {
+      // 遍历选定的难度
+      for (int i = 0; i < targetDifficulties.length; i++) {
         if (!_isFetching) break;
-        
-        final difficulty = _difficulties[diffIndex];
+
+        final difficulty = targetDifficulties[i];
+        final diffIndex = _difficulties.indexOf(difficulty);
+
+        if (diffIndex == -1) {
+          print('[ScoreFetch] 跳过未知难度: $difficulty');
+          continue;
+        }
+
         print('[ScoreFetch] 增量更新难度: $difficulty');
-        
+
         // 发送当前难度信息
         _difficultyStreamController.add(difficulty);
-        
+
         // 拉取该难度的新成绩
-        final difficultyScores = await _fetchAllPagesForDifficulty(difficulty, diffIndex);
-        
+        final difficultyScores = await _fetchAllPagesForDifficulty(
+          difficulty,
+          diffIndex,
+        );
+
         if (difficultyScores.isEmpty) {
           print('[ScoreFetch] 难度 $difficulty 没有新成绩');
         } else {
-          print('[ScoreFetch] 难度 $difficulty 共拉取 ${difficultyScores.length} 条新成绩');
-          
+          print(
+            '[ScoreFetch] 难度 $difficulty 共拉取 ${difficultyScores.length} 条新成绩',
+          );
+
           // 追加新成绩（使用存储服务的合并去重功能）
           await _storageService.appendScores(difficultyScores);
-          
+
           // 重新加载所有成绩以更新UI
           _allScores = await _storageService.loadScores();
         }
-        
+
         print('[ScoreFetch] 难度 $difficulty 增量更新完成');
-        
+
         // 难度之间延迟
-        if (diffIndex < _difficulties.length - 1 && _isFetching) {
+        if (i < targetDifficulties.length - 1 && _isFetching) {
           await Future.delayed(const Duration(milliseconds: 1000));
         }
       }
@@ -102,39 +125,47 @@ class ScoreFetchService {
     _allScores = [];
 
     try {
+      // 确保歌曲数据已加载
+      await _songDataService.ensureLoaded();
+
       // 遍历所有难度
       for (int diffIndex = 0; diffIndex < _difficulties.length; diffIndex++) {
         if (!_isFetching) break;
-        
+
         final difficulty = _difficulties[diffIndex];
         print('[ScoreFetch] 开始拉取难度: $difficulty');
-        
+
         // 发送当前难度信息
         _difficultyStreamController.add(difficulty);
-        
+
         // 拉取该难度的所有页面
-        final difficultyScores = await _fetchAllPagesForDifficulty(difficulty, diffIndex);
-        
+        final difficultyScores = await _fetchAllPagesForDifficulty(
+          difficulty,
+          diffIndex,
+        );
+
         if (difficultyScores.isEmpty) {
           print('[ScoreFetch] 难度 $difficulty 没有成绩数据');
         } else {
-          print('[ScoreFetch] 难度 $difficulty 共拉取 ${difficultyScores.length} 条成绩');
-          
+          print(
+            '[ScoreFetch] 难度 $difficulty 共拉取 ${difficultyScores.length} 条成绩',
+          );
+
           // 添加前先去重（防止与已有成绩重复）
           final beforeCount = _allScores.length;
           _allScores.addAll(difficultyScores);
           _allScores = _deduplicateScores(_allScores);
           final afterCount = _allScores.length;
           final addedCount = afterCount - beforeCount;
-          
+
           print('[ScoreFetch] 去重后实际新增 $addedCount 条成绩（总计 $afterCount 条）');
-          
+
           // 保存到本地存储
           await _storageService.saveScores(_allScores);
         }
-        
+
         print('[ScoreFetch] 难度 $difficulty 拉取完成');
-        
+
         // 难度之间延迟
         if (diffIndex < _difficulties.length - 1 && _isFetching) {
           await Future.delayed(const Duration(milliseconds: 1000));
@@ -144,7 +175,7 @@ class ScoreFetchService {
       // 最终去重并保存
       _allScores = _deduplicateScores(_allScores);
       await _storageService.saveScores(_allScores);
-      
+
       _isFetching = false;
       _progressStreamController.add(-1); // 完成标记
       print('[ScoreFetch] 所有难度拉取完成，去重后总计 ${_allScores.length} 条成绩');
@@ -164,11 +195,11 @@ class ScoreFetchService {
   /// 去重规则：相同歌曲标题 + 相同难度，只保留分数最高的
   List<ScoreData> _deduplicateScores(List<ScoreData> scores) {
     final Map<String, ScoreData> scoreMap = {};
-    
+
     for (var score in scores) {
       // 生成唯一键：歌曲标题_难度
       final key = '${score.songTitle}_${score.difficulty}';
-      
+
       // 如果key已存在，比较分数，保留分数更高的
       if (scoreMap.containsKey(key)) {
         final existing = scoreMap[key]!;
@@ -182,19 +213,21 @@ class ScoreFetchService {
         scoreMap[key] = score;
       }
     }
-    
+
     final deduplicated = scoreMap.values.toList();
     if (deduplicated.length < scores.length) {
-      print('[ScoreFetch] 去重：${scores.length} 条 -> ${deduplicated.length} 条（移除 ${scores.length - deduplicated.length} 条重复，保留最高分）');
+      print(
+        '[ScoreFetch] 去重：${scores.length} 条 -> ${deduplicated.length} 条（移除 ${scores.length - deduplicated.length} 条重复，保留最高分）',
+      );
     }
-    
+
     return deduplicated;
   }
 
   /// 从URL中提取page参数的值
   int? _extractPageNumber(String? url) {
     if (url == null || url.isEmpty) return null;
-    
+
     try {
       final uri = Uri.parse(url);
       final pageParam = uri.queryParameters['page'];
@@ -204,12 +237,15 @@ class ScoreFetchService {
     } catch (e) {
       print('[ScoreFetch] 解析URL失败: $e');
     }
-    
+
     return null;
   }
 
   /// 拉取指定难度的所有页面（包括第一页和后续页面）
-  Future<List<ScoreData>> _fetchAllPagesForDifficulty(String difficulty, int difficultyIndex) async {
+  Future<List<ScoreData>> _fetchAllPagesForDifficulty(
+    String difficulty,
+    int difficultyIndex,
+  ) async {
     var allDifficultyScores = <ScoreData>[]; // 改为var以便重新赋值
     final completer = Completer<List<ScoreData>>();
     final url = 'https://arcaea.lowiro.com/zh/profile/scores?page=1';
@@ -219,46 +255,50 @@ class ScoreFetchService {
         initialUrlRequest: URLRequest(url: WebUri(url)),
         initialSettings: InAppWebViewSettings(
           javaScriptEnabled: true,
-          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          userAgent:
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         ),
         onLoadStop: (controller, url) async {
           try {
             print('[ScoreFetch] 页面加载完成，等待DOM渲染...');
-            
+
             // 等待DOM加载
             await Future.delayed(const Duration(milliseconds: 2000));
-            
+
             // 等待DOM元素出现
             bool domReady = false;
             for (int i = 0; i < 20; i++) {
               await Future.delayed(const Duration(milliseconds: 500));
-              
-              final checkDom = await controller.evaluateJavascript(source: '''
+
+              final checkDom = await controller.evaluateJavascript(
+                source: '''
                 (function() {
                   const diffSelectors = document.querySelectorAll('.difficulty-selector');
                   const cards = document.querySelectorAll('.list-card .card-container');
                   return diffSelectors.length > 0 && cards.length > 0;
                 })();
-              ''');
-              
+              ''',
+              );
+
               if (checkDom == true) {
                 domReady = true;
                 print('[ScoreFetch] DOM已就绪');
                 break;
               }
             }
-            
+
             if (!domReady) {
               print('[ScoreFetch] DOM未就绪');
               completer.complete([]);
               return;
             }
-            
+
             await Future.delayed(const Duration(milliseconds: 1000));
             print('[ScoreFetch] 开始切换难度到: $difficulty');
 
             // 切换到目标难度
-            final clickScript = '''
+            final clickScript =
+                '''
               (function() {
                 const diffSelectors = document.querySelectorAll('.difficulty-selector');
                 if ($difficultyIndex < diffSelectors.length) {
@@ -269,56 +309,83 @@ class ScoreFetchService {
                 return false;
               })();
             ''';
-            
-            final clickResult = await controller.evaluateJavascript(source: clickScript);
-            
+
+            final clickResult = await controller.evaluateJavascript(
+              source: clickScript,
+            );
+
             if (clickResult != true) {
               print('[ScoreFetch] 切换难度失败');
               completer.complete([]);
               return;
             }
-            
+
             // 等待Vue重新渲染
             await Future.delayed(const Duration(milliseconds: 3000));
-            
+
             // 开始拉取所有页面
             int currentPage = 1;
             bool hasMore = true;
             int consecutiveEmptyPages = 0; // 连续空页计数
             int consecutiveFailedUpdates = 0; // 连续翻页失败计数
-            
+
             while (hasMore && _isFetching) {
               print('[ScoreFetch] 拉取难度 $difficulty 第 $currentPage 页');
-              
+
               // 记录当前页面第一首歌的标题（用于检测页面是否真的更新了）
               final firstSongTitle = await _getFirstSongTitle(controller);
               print('[ScoreFetch] 当前页第一首歌: $firstSongTitle');
-              
+
               // 解析当前页面数据
               final parseScript = _getParseScript(difficulty);
-              final result = await controller.evaluateJavascript(source: parseScript);
-              
-                  if (result != null && result is String && result.isNotEmpty) {
-                    try {
-                      final data = jsonDecode(result);
-                      final playerPTTValue = data['playerPTT'];
-                      double? parsedPTT;
-                      if (playerPTTValue is num) {
-                        parsedPTT = playerPTTValue.toDouble();
-                      } else if (playerPTTValue is String) {
-                        parsedPTT = double.tryParse(playerPTTValue);
-                      }
+              final result = await controller.evaluateJavascript(
+                source: parseScript,
+              );
 
-                      if (parsedPTT != null && _latestPlayerPTT != parsedPTT) {
-                        _latestPlayerPTT = parsedPTT;
-                        await _storageService.savePlayerPTT(parsedPTT);
+              if (result != null && result is String && result.isNotEmpty) {
+                try {
+                  final data = jsonDecode(result);
+                  final playerPTTValue = data['playerPTT'];
+                  double? parsedPTT;
+                  if (playerPTTValue is num) {
+                    parsedPTT = playerPTTValue.toDouble();
+                  } else if (playerPTTValue is String) {
+                    parsedPTT = double.tryParse(playerPTTValue);
+                  }
+
+                  if (parsedPTT != null && _latestPlayerPTT != parsedPTT) {
+                    _latestPlayerPTT = parsedPTT;
+                    await _storageService.savePlayerPTT(parsedPTT);
+                  }
+                  var scores = (data['scores'] as List<dynamic>)
+                      .map((e) => ScoreData.fromJson(e as Map<String, dynamic>))
+                      .toList();
+
+                  // 针对 ETR 和 BYD 难度进行额外校验，防止拉取到不存在该难度的曲目成绩
+                  if (difficulty == 'BYD' || difficulty == 'ETR') {
+                    final originalCount = scores.length;
+                    scores = scores.where((score) {
+                      final hasDiff = _songDataService.hasDifficulty(
+                        score.songTitle,
+                        difficulty,
+                      );
+                      if (!hasDiff) {
+                        print('[ScoreFetch] 过滤无效$difficulty成绩: ${score.songTitle}');
                       }
-                      final scores = (data['scores'] as List<dynamic>)
-                          .map((e) => ScoreData.fromJson(e as Map<String, dynamic>))
-                          .toList();
-                  
-                  print('[ScoreFetch] 第 $currentPage 页解析到 ${scores.length} 条成绩');
-                  
+                      return hasDiff;
+                    }).toList();
+
+                    if (scores.length < originalCount) {
+                      print(
+                        '[ScoreFetch] $difficulty难度过滤: $originalCount -> ${scores.length}',
+                      );
+                    }
+                  }
+
+                  print(
+                    '[ScoreFetch] 第 $currentPage 页解析到 ${scores.length} 条成绩',
+                  );
+
                   // 检查是否为空页
                   if (scores.isEmpty) {
                     consecutiveEmptyPages++;
@@ -330,27 +397,31 @@ class ScoreFetchService {
                     }
                   } else {
                     consecutiveEmptyPages = 0;
-                    
+
                     // 如果是增量更新模式，检查是否遇到已有日期的成绩
                     if (_isUpdateMode) {
                       bool foundExistingDate = false;
                       List<ScoreData> newScores = [];
-                      
+
                       for (var score in scores) {
                         if (_existingDates.contains(score.obtainedDate)) {
-                          print('[ScoreFetch] 检测到已有日期 ${score.obtainedDate}，停止拉取该难度');
+                          print(
+                            '[ScoreFetch] 检测到已有日期 ${score.obtainedDate}，停止拉取该难度',
+                          );
                           foundExistingDate = true;
                           break;
                         }
                         newScores.add(score);
                       }
-                      
+
                       // 只添加新成绩
                       if (newScores.isNotEmpty) {
                         allDifficultyScores.addAll(newScores);
-                        allDifficultyScores = _deduplicateScores(allDifficultyScores);
+                        allDifficultyScores = _deduplicateScores(
+                          allDifficultyScores,
+                        );
                       }
-                      
+
                       // 如果遇到已有日期，停止拉取该难度
                       if (foundExistingDate) {
                         hasMore = false;
@@ -359,28 +430,37 @@ class ScoreFetchService {
                     } else {
                       // 全量拉取模式，添加所有成绩
                       allDifficultyScores.addAll(scores);
-                      allDifficultyScores = _deduplicateScores(allDifficultyScores);
+                      allDifficultyScores = _deduplicateScores(
+                        allDifficultyScores,
+                      );
                     }
                   }
-                  
+
                   // 更新UI
-                  _scoreStreamController.add(ScoreListResponse(
-                    scores: List.from(_allScores)..addAll(allDifficultyScores),
-                    currentPage: currentPage,
-                    hasNextPage: data['hasNextPage'] as bool,
-                    playerPTT: _latestPlayerPTT,
-                  ));
-                  
+                  _scoreStreamController.add(
+                    ScoreListResponse(
+                      scores: List.from(_allScores)
+                        ..addAll(allDifficultyScores),
+                      currentPage: currentPage,
+                      hasNextPage: data['hasNextPage'] as bool,
+                      playerPTT: _latestPlayerPTT,
+                    ),
+                  );
+
                   hasMore = data['hasNextPage'] as bool;
-                  
+
                   if (hasMore) {
                     // 点击翻页按钮前，记录当前URL的page值
                     final currentUrl = await controller.getUrl();
-                    final currentPageNum = _extractPageNumber(currentUrl?.toString());
+                    final currentPageNum = _extractPageNumber(
+                      currentUrl?.toString(),
+                    );
                     print('[ScoreFetch] 当前URL页码: $currentPageNum');
-                    
+
                     // 点击下一页按钮
-                    final nextPageResult = await _clickNextPageButton(controller);
+                    final nextPageResult = await _clickNextPageButton(
+                      controller,
+                    );
                     if (!nextPageResult) {
                       print('[ScoreFetch] 点击下一页失败，认为已到最后一页');
                       hasMore = false;
@@ -389,32 +469,45 @@ class ScoreFetchService {
                       bool pageUpdated = false;
                       for (int i = 0; i < 20; i++) {
                         await Future.delayed(const Duration(milliseconds: 500));
-                        final newFirstSongTitle = await _getFirstSongTitle(controller);
-                        
-                        if (newFirstSongTitle != firstSongTitle && newFirstSongTitle.isNotEmpty) {
-                          print('[ScoreFetch] 页面已更新，新页第一首歌: $newFirstSongTitle');
-                          
+                        final newFirstSongTitle = await _getFirstSongTitle(
+                          controller,
+                        );
+
+                        if (newFirstSongTitle != firstSongTitle &&
+                            newFirstSongTitle.isNotEmpty) {
+                          print(
+                            '[ScoreFetch] 页面已更新，新页第一首歌: $newFirstSongTitle',
+                          );
+
                           // 检查URL的page值是否变小了（循环回第一页的标志）
                           final newUrl = await controller.getUrl();
-                          final newPageNum = _extractPageNumber(newUrl?.toString());
+                          final newPageNum = _extractPageNumber(
+                            newUrl?.toString(),
+                          );
                           print('[ScoreFetch] 新URL页码: $newPageNum');
-                          
-                          if (newPageNum != null && currentPageNum != null && newPageNum <= currentPageNum) {
-                            print('[ScoreFetch] 检测到页码循环（$currentPageNum -> $newPageNum），已到最后一页');
+
+                          if (newPageNum != null &&
+                              currentPageNum != null &&
+                              newPageNum <= currentPageNum) {
+                            print(
+                              '[ScoreFetch] 检测到页码循环（$currentPageNum -> $newPageNum），已到最后一页',
+                            );
                             hasMore = false;
                             break;
                           }
-                          
+
                           pageUpdated = true;
                           consecutiveFailedUpdates = 0;
                           break;
                         }
                       }
-                      
+
                       if (!pageUpdated) {
                         consecutiveFailedUpdates++;
-                        print('[ScoreFetch] 10秒内页面未更新，连续失败次数: $consecutiveFailedUpdates');
-                        
+                        print(
+                          '[ScoreFetch] 10秒内页面未更新，连续失败次数: $consecutiveFailedUpdates',
+                        );
+
                         if (consecutiveFailedUpdates >= 2) {
                           print('[ScoreFetch] 连续2次翻页失败，认为已到最后一页');
                           hasMore = false;
@@ -422,9 +515,11 @@ class ScoreFetchService {
                       } else if (hasMore) {
                         // 只有在hasMore仍为true时才增加页码
                         currentPage++;
-                        
+
                         // 更新进度
-                        final progress = (difficultyIndex * 100 + currentPage) / (_difficulties.length * 100);
+                        final progress =
+                            (difficultyIndex * 100 + currentPage) /
+                            (_difficulties.length * 100);
                         _progressStreamController.add(progress);
                       }
                     }
@@ -438,7 +533,7 @@ class ScoreFetchService {
                 hasMore = false;
               }
             }
-            
+
             completer.complete(allDifficultyScores);
           } catch (e) {
             print('[ScoreFetch] 拉取错误: $e');
@@ -461,11 +556,11 @@ class ScoreFetchService {
           return allDifficultyScores;
         },
       );
-      
+
       // 清理WebView
       await _headlessWebView?.dispose();
       _headlessWebView = null;
-      
+
       return result;
     } catch (e) {
       print('[ScoreFetch] 拉取难度 $difficulty 错误: $e');
@@ -488,7 +583,7 @@ class ScoreFetchService {
           return '';
         })();
       ''';
-      
+
       final result = await controller.evaluateJavascript(source: titleScript);
       return result?.toString() ?? '';
     } catch (e) {
@@ -549,7 +644,7 @@ class ScoreFetchService {
           }
         })();
       ''';
-      
+
       final result = await controller.evaluateJavascript(source: clickScript);
       return result == true;
     } catch (e) {

@@ -10,6 +10,7 @@ import '../services/image_generator_service.dart';
 import '../services/score_fetch_service.dart';
 import '../services/score_storage_service.dart';
 import '../services/song_data_service.dart';
+import 'difficulty_selector_dialog.dart';
 import 'score_filter_dialog.dart';
 
 /// 成绩列表页面
@@ -28,14 +29,14 @@ class _ScoreListPageState extends State<ScoreListPage> {
   final SongDataService _songDataService = SongDataService();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  
+
   List<ScoreData> _scores = [];
   List<ScoreData> _filteredScores = [];
   String _searchQuery = '';
   ScoreSortOption _currentSortOption = ScoreSortOption.dateDescending;
   ScoreFilter _currentFilter = const ScoreFilter();
   bool _showScrollToTop = false;
-  
+
   bool _isFetching = false;
   bool _isLoading = true;
   int _currentPage = 0;
@@ -127,8 +128,9 @@ class _ScoreListPageState extends State<ScoreListPage> {
     final totalPTT = data.player.totalPTT;
     final lookup = _buildB30Lookup(data);
     final best30Min = _computeMinPTT(data.best30);
-    final recentReplacement =
-        data.recent10.isNotEmpty ? data.recent10.last.playPTT : null;
+    final recentReplacement = data.recent10.isNotEmpty
+        ? data.recent10.last.playPTT
+        : null;
 
     if (mounted) {
       setState(() {
@@ -167,21 +169,22 @@ class _ScoreListPageState extends State<ScoreListPage> {
   Map<String, _B30EntryInfo> _buildB30Lookup(B30R10Data data) {
     final map = <String, _B30EntryInfo>{};
     for (final song in data.best30) {
-      map[_buildSongKey(song.songTitle, song.difficulty)] =
-          _B30EntryInfo(song, false);
+      map[_buildSongKey(song.songTitle, song.difficulty)] = _B30EntryInfo(
+        song,
+        false,
+      );
     }
     for (final song in data.recent10) {
-      map[_buildSongKey(song.songTitle, song.difficulty)] =
-          _B30EntryInfo(song, true);
+      map[_buildSongKey(song.songTitle, song.difficulty)] = _B30EntryInfo(
+        song,
+        true,
+      );
     }
     return map;
   }
 
   double? _computeMinPTT(List<SongCardData> songs) {
-    final values = songs
-        .map((s) => s.playPTT)
-        .whereType<double>()
-        .toList()
+    final values = songs.map((s) => s.playPTT).whereType<double>().toList()
       ..sort();
     return values.isNotEmpty ? values.first : null;
   }
@@ -351,13 +354,15 @@ class _ScoreListPageState extends State<ScoreListPage> {
       }
 
       // 目标筛选
-      if (filter.onlyWithTarget || filter.targetMin != null || filter.targetMax != null) {
+      if (filter.onlyWithTarget ||
+          filter.targetMin != null ||
+          filter.targetMax != null) {
         final target = _getScoreTarget(score);
-        
+
         if (filter.onlyWithTarget && target == null) {
           return false;
         }
-        
+
         if (filter.targetMin != null) {
           if (target == null || target < filter.targetMin!) {
             return false;
@@ -377,7 +382,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
   /// 排序成绩列表
   List<ScoreData> _sortScores(List<ScoreData> scores, ScoreSortOption option) {
     final sorted = List<ScoreData>.from(scores);
-    
+
     switch (option) {
       case ScoreSortOption.dateDescending:
         // 按日期倒序（最新在前）
@@ -403,7 +408,10 @@ class _ScoreListPageState extends State<ScoreListPage> {
 
       case ScoreSortOption.songTitle:
         // 按曲名
-        sorted.sort((a, b) => a.songTitle.toLowerCase().compareTo(b.songTitle.toLowerCase()));
+        sorted.sort(
+          (a, b) =>
+              a.songTitle.toLowerCase().compareTo(b.songTitle.toLowerCase()),
+        );
         break;
 
       case ScoreSortOption.constant:
@@ -439,7 +447,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
         sorted.sort((a, b) {
           final targetA = _getScoreTarget(a);
           final targetB = _getScoreTarget(b);
-          
+
           // 如果两个都没有目标，保持原顺序
           if (targetA == null && targetB == null) return 0;
           // 如果 a 没有目标，a 排后面
@@ -456,7 +464,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
         sorted.sort((a, b) {
           final targetA = _getScoreTarget(a);
           final targetB = _getScoreTarget(b);
-          
+
           // 如果两个都没有目标，保持原顺序
           if (targetA == null && targetB == null) return 0;
           // 如果 a 没有目标，a 排后面
@@ -473,7 +481,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
         sorted.sort((a, b) {
           final diffA = _getScoreTargetDiff(a);
           final diffB = _getScoreTargetDiff(b);
-          
+
           // 如果两个都没有目标差，保持原顺序
           if (diffA == null && diffB == null) return 0;
           // 如果 a 没有目标差，a 排后面
@@ -490,7 +498,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
         sorted.sort((a, b) {
           final diffA = _getScoreTargetDiff(a);
           final diffB = _getScoreTargetDiff(b);
-          
+
           // 如果两个都没有目标差，保持原顺序
           if (diffA == null && diffB == null) return 0;
           // 如果 a 没有目标差，a 排后面
@@ -502,7 +510,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
         });
         break;
     }
-    
+
     return sorted;
   }
 
@@ -510,17 +518,17 @@ class _ScoreListPageState extends State<ScoreListPage> {
   double? _getScoreConstant(ScoreData score) {
     final cardKey = _buildSongKey(score.songTitle, score.difficulty);
     final entryInfo = _b30Lookup[cardKey];
-    return entryInfo?.data.constant ?? 
-           (_isSongDataReady
-               ? _songDataService.getConstant(score.songTitle, score.difficulty)
-               : null);
+    return entryInfo?.data.constant ??
+        (_isSongDataReady
+            ? _songDataService.getConstant(score.songTitle, score.difficulty)
+            : null);
   }
 
   /// 获取成绩的单曲PTT
   double? _getScorePlayPTT(ScoreData score) {
     final constant = _getScoreConstant(score);
     if (constant == null) return null;
-    
+
     final cardKey = _buildSongKey(score.songTitle, score.difficulty);
     final entryInfo = _b30Lookup[cardKey];
     return entryInfo?.data.playPTT ?? _calculatePlayPTT(score.score, constant);
@@ -530,13 +538,13 @@ class _ScoreListPageState extends State<ScoreListPage> {
   int? _getScoreTarget(ScoreData score) {
     final constant = _getScoreConstant(score);
     if (constant == null || _playerPTT == null) return null;
-    
+
     final cardKey = _buildSongKey(score.songTitle, score.difficulty);
     final entryInfo = _b30Lookup[cardKey];
     final cardData = entryInfo?.data;
-    
+
     int? targetScore;
-    
+
     // 如果在 B30/R10 中，直接计算目标
     if (cardData != null) {
       targetScore = ImageGeneratorService.calculateTargetScore(
@@ -544,7 +552,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
         score.score,
         _playerPTT,
       );
-    } 
+    }
     // 否则，尝试计算替代 B30 或 R10 的目标
     else if (_best30MinPTT != null || _recent10ReplacementPTT != null) {
       final candidates = <_TargetCandidate>[];
@@ -578,7 +586,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
         targetScore = candidates.first.score;
       }
     }
-    
+
     return targetScore;
   }
 
@@ -593,9 +601,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
   Future<void> _showFilterDialog() async {
     final filter = await showDialog<ScoreFilter>(
       context: context,
-      builder: (context) => ScoreFilterDialog(
-        initialFilter: _currentFilter,
-      ),
+      builder: (context) => ScoreFilterDialog(initialFilter: _currentFilter),
     );
 
     if (filter != null && mounted) {
@@ -642,11 +648,24 @@ class _ScoreListPageState extends State<ScoreListPage> {
     });
   }
 
-  void _startUpdating() {
+  Future<void> _startUpdating() async {
+    // 显示难度选择对话框
+    final selectedDifficulties = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => const DifficultySelectorDialog(),
+    );
+
+    // 如果用户取消选择，则不执行更新
+    if (selectedDifficulties == null || selectedDifficulties.isEmpty) {
+      return;
+    }
+
     // 显示进度条弹窗
     _showProgressDialog();
 
-    _fetchService.startUpdating().then((_) async {
+    _fetchService.startUpdating(difficulties: selectedDifficulties).then((
+      _,
+    ) async {
       if (mounted) {
         Navigator.of(context).pop(); // 关闭进度条弹窗
         // 更新完成后重新加载成绩
@@ -873,7 +892,9 @@ class _ScoreListPageState extends State<ScoreListPage> {
               margin: const EdgeInsets.symmetric(horizontal: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primaryContainer.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -899,14 +920,14 @@ class _ScoreListPageState extends State<ScoreListPage> {
                       TextButton(
                         onPressed: _clearFilter,
                         style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child: const Text(
-                          '清除',
-                          style: TextStyle(fontSize: 12),
-                        ),
+                        child: const Text('清除', style: TextStyle(fontSize: 12)),
                       ),
                     ],
                   ),
@@ -923,14 +944,18 @@ class _ScoreListPageState extends State<ScoreListPage> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primaryContainer,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primaryContainer,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               desc,
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onPrimaryContainer,
                               ),
                             ),
                           ),
@@ -1045,11 +1070,16 @@ class _ScoreListPageState extends State<ScoreListPage> {
         final entryInfo = _b30Lookup[cardKey];
         final cardData = entryInfo?.data;
 
-        final constant = cardData?.constant ??
+        final constant =
+            cardData?.constant ??
             (_isSongDataReady
-                ? _songDataService.getConstant(score.songTitle, score.difficulty)
+                ? _songDataService.getConstant(
+                    score.songTitle,
+                    score.difficulty,
+                  )
                 : null);
-        final playPTT = cardData?.playPTT ??
+        final playPTT =
+            cardData?.playPTT ??
             ((constant != null)
                 ? _calculatePlayPTT(score.score, constant)
                 : null);
@@ -1057,9 +1087,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
         int? targetScore;
         String? targetSource;
 
-        if (cardData != null &&
-            constant != null &&
-            _playerPTT != null) {
+        if (cardData != null && constant != null && _playerPTT != null) {
           targetScore = ImageGeneratorService.calculateTargetScore(
             constant,
             score.score,
@@ -1240,8 +1268,7 @@ class _ScoreCard extends StatelessWidget {
     Color? valueColor,
   }) {
     final scheme = Theme.of(context).colorScheme;
-    final chipColor =
-        scheme.surfaceContainerHighest.withValues(alpha: 0.7);
+    final chipColor = scheme.surfaceContainerHighest.withValues(alpha: 0.7);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(

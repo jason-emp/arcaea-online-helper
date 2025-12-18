@@ -133,6 +133,22 @@ class SongDataService {
     return null;
   }
 
+  /// 检查歌曲是否有指定难度
+  bool hasDifficulty(String songTitle, String difficulty) {
+    if (!_isLoaded) return false;
+    final songId = _findSongId(songTitle);
+    if (songId == null) return false;
+
+    final constants = _chartConstants?[songId];
+    if (constants is! List) return false;
+
+    final diffIndex = _parseDifficultyIndex(difficulty);
+    if (diffIndex < 0 || diffIndex >= constants.length) return false;
+
+    final entry = constants[diffIndex];
+    return entry != null;
+  }
+
   int _parseDifficultyIndex(String difficulty) {
     final normalized = difficulty.trim().toLowerCase();
     switch (normalized) {
@@ -147,10 +163,10 @@ class SongDataService {
         return 2;
       case 'beyond':
       case 'byd':
-        return 3;
+        return 4;
       case 'eternal':
       case 'etr':
-        return 4;
+        return 3;
       default:
         return -1;
     }
