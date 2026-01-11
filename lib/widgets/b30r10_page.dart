@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/b30r10_data.dart';
 import '../services/image_generation_manager.dart';
+import '../services/score_storage_service.dart';
 import '../widgets/settings_dialog.dart';
 
 /// B30/R10 Flutter列表页面
@@ -60,6 +61,8 @@ class _B30R10PageState extends State<B30R10Page> {
   int _retryCount = 0;
   static const int _maxRetries = 3;
   static const int _loadWaitTime = 3000; // 3秒等待时间
+  final ScoreStorageService _storageService = ScoreStorageService();
+  double? _pttDifference; // PTT差值
 
   @override
   void initState() {
@@ -98,6 +101,12 @@ class _B30R10PageState extends State<B30R10Page> {
 
   /// 刷新数据（带重试机制）
   Future<void> _refresh() async {
+    // 在开始刷新前，保存当前PTT作为上一次的PTT
+    final currentPTT = _data?.player.totalPTT;
+    if (currentPTT != null) {
+      await _storageService.savePreviousPTT(currentPTT);
+    }
+
     setState(() {
       _isLoading = true;
       _loadFailed = false;
@@ -106,7 +115,8 @@ class _B30R10PageState extends State<B30R10Page> {
     // 监听数据变化
     void dataListener() {
       if (_data != null && mounted) {
-        // 数据加载成功
+        // 数据加载成功，对比PTT变化
+        _comparePTT();
         widget.imageManager.removeListener(dataListener);
         setState(() {
           _isLoading = false;
@@ -143,6 +153,10 @@ class _B30R10PageState extends State<B30R10Page> {
         }
       } else {
         // 达到最大重试次数或加载成功
+        if (hasData) {
+          // 对比PTT变化
+          await _comparePTT();
+        }
         setState(() {
           _isLoading = false;
           if (!hasData) {
@@ -157,6 +171,39 @@ class _B30R10PageState extends State<B30R10Page> {
           }
         });
       }
+    }
+  }
+
+  /// 对比PTT变化
+  Future<void> _comparePTT() async {
+    final currentPTT = _data?.player.totalPTT;
+    if (currentPTT == null) {
+      setState(() {
+        _pttDifference = null;
+      });
+      return;
+    }
+
+    final previousPTT = await _storageService.getPreviousPTT();
+    if (previousPTT == null) {
+      // 第一次加载，没有上一次的PTT
+      setState(() {
+        _pttDifference = null;
+      });
+      return;
+    }
+
+    final difference = currentPTT - previousPTT;
+    // 只有当差值不为0时才显示
+    if (difference.abs() < 0.0001) {
+      // 差值太小，视为没有变化
+      setState(() {
+        _pttDifference = null;
+      });
+    } else {
+      setState(() {
+        _pttDifference = difference;
+      });
     }
   }
 
@@ -395,6 +442,18 @@ class _B30R10PageState extends State<B30R10Page> {
                       color: scheme.primary,
                     ),
                   ),
+                  // 显示PTT变化
+                  if (_pttDifference != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_pttDifference! >= 0 ? '+' : ''}${_pttDifference!.toStringAsFixed(4)}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _pttDifference! >= 0 ? Colors.green : Colors.red,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

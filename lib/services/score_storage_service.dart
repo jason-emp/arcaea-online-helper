@@ -13,6 +13,7 @@ class ScoreStorageService {
   static const String _playerPTTKey = 'scores_player_ptt';
   static const String _sortOptionKey = 'score_sort_option';
   static const String _b30DataKey = 'cached_b30_data';
+  static const String _previousPTTKey = 'previous_ptt';
 
   /// 保存成绩列表
   Future<void> saveScores(List<ScoreData> scores) async {
@@ -249,6 +250,26 @@ class ScoreStorageService {
 
       final Map<String, dynamic> jsonData = jsonDecode(jsonString);
       return B30R10Data.fromJson(jsonData);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// 保存上一次的PTT（用于对比）
+  Future<void> savePreviousPTT(double? ptt) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (ptt == null) {
+      await prefs.remove(_previousPTTKey);
+    } else {
+      await prefs.setDouble(_previousPTTKey, ptt);
+    }
+  }
+
+  /// 读取上一次的PTT
+  Future<double?> getPreviousPTT() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getDouble(_previousPTTKey);
     } catch (e) {
       return null;
     }
