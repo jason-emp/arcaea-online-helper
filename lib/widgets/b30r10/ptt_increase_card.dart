@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/utils/ptt_calculator.dart';
+import '../../core/core.dart';
 
 /// 推分参考卡片
 class PTTIncreaseCard extends StatelessWidget {

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../core/theme/arcaea_colors.dart';
-import '../core/utils/formatters.dart';
-import '../core/utils/ptt_calculator.dart';
+import '../core/core.dart';
 import '../models/b30r10_data.dart';
 import '../models/score_data.dart';
 import '../models/score_filter.dart';
@@ -43,8 +41,6 @@ class _ScoreListPageState extends State<ScoreListPage> {
 
   bool _isFetching = false;
   bool _isLoading = true;
-  int _currentPage = 0;
-  DateTime? _lastUpdateTime;
   bool _hasFetched = false;
   bool _isSongDataReady = false;
   double? _playerPTT;
@@ -206,13 +202,11 @@ class _ScoreListPageState extends State<ScoreListPage> {
   Future<void> _loadCachedScores() async {
     try {
       final scores = await _storageService.loadScores();
-      final lastUpdate = await _storageService.getLastUpdateTime();
       final cachedPTT = await _storageService.getPlayerPTT();
 
       if (mounted) {
         setState(() {
           _scores = scores;
-          _lastUpdateTime = lastUpdate;
           _isLoading = false;
           _hasFetched = scores.isNotEmpty;
           _playerPTT = cachedPTT;
@@ -233,7 +227,6 @@ class _ScoreListPageState extends State<ScoreListPage> {
       if (mounted) {
         setState(() {
           _scores = response.scores;
-          _currentPage = response.currentPage;
           if (response.playerPTT != null) {
             _playerPTT = response.playerPTT;
           }
@@ -736,7 +729,6 @@ class _ScoreListPageState extends State<ScoreListPage> {
   void _startFetching() {
     setState(() {
       _scores = [];
-      _currentPage = 0;
     });
 
     // 显示进度条弹窗
@@ -886,7 +878,6 @@ class _ScoreListPageState extends State<ScoreListPage> {
         await _storageService.clearCache();
         setState(() {
           _scores = [];
-          _lastUpdateTime = null;
           _hasFetched = false;
           _playerPTT = null;
         });

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/arcaea_colors.dart';
-import '../../core/utils/formatters.dart';
+import '../../core/core.dart';
 import '../../models/score_data.dart';
 import '../common/arcaea_widgets.dart';
 

@@ -1,18 +1,11 @@
 import 'package:flutter/material.dart';
-import '../core/theme/arcaea_colors.dart';
-import '../core/utils/difficulty_utils.dart';
-import '../core/utils/formatters.dart';
-import '../core/utils/ptt_calculator.dart';
+import '../core/core.dart';
 import '../models/app_settings.dart';
 import '../models/b30r10_data.dart';
 import '../models/score_data.dart';
 import '../services/image_generation_manager.dart';
 import '../services/score_storage_service.dart';
 import '../services/song_data_service.dart';
-import 'common/arcaea_widgets.dart';
-import 'b30r10/player_card.dart';
-import 'b30r10/ptt_increase_card.dart';
-import 'b30r10/song_card.dart';
 import 'settings_dialog.dart';
 
 /// B30/R10 Flutter列表页面

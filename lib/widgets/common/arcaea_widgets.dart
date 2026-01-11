@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/arcaea_colors.dart';
+import '../../core/core.dart';
 
 /// 难度标签组件
 class DifficultyChip extends StatelessWidget {

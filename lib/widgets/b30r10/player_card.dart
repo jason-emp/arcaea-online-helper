@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/arcaea_colors.dart';
+import '../../core/core.dart';
 import '../../models/b30r10_data.dart';
 
 /// 玩家信息卡片

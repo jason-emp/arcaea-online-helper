@@ -1,5 +1,4 @@
-import '../../core/utils/difficulty_utils.dart';
-import '../../core/utils/ptt_calculator.dart';
+import '../../core/core.dart';
 import '../../models/b30r10_data.dart';
 import '../../models/score_data.dart';
 import '../../services/image_generation_manager.dart';
