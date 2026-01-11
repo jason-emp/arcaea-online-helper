@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import '../models/app_settings.dart';
 import '../models/b30r10_data.dart';
+import '../models/score_data.dart';
 import '../services/image_generation_manager.dart';
 import '../services/score_storage_service.dart';
+import '../services/song_data_service.dart';
 import '../widgets/settings_dialog.dart';
 
 /// B30/R10 Flutter列表页面
@@ -26,6 +29,8 @@ class B30R10Page extends StatefulWidget {
   final String? updateStatusMessage;
   final String? dataUpdateMessage;
   final DateTime? lastDataUpdateTime;
+  final AppSettings settings;
+  final ValueChanged<AppSettings> onSettingsChanged;
 
   const B30R10Page({
     super.key,
@@ -47,6 +52,8 @@ class B30R10Page extends StatefulWidget {
     this.updateStatusMessage,
     this.dataUpdateMessage,
     this.lastDataUpdateTime,
+    required this.settings,
+    required this.onSettingsChanged,
   });
 
   @override
@@ -62,7 +69,11 @@ class _B30R10PageState extends State<B30R10Page> {
   static const int _maxRetries = 3;
   static const int _loadWaitTime = 3000; // 3秒等待时间
   final ScoreStorageService _storageService = ScoreStorageService();
+  final SongDataService _songDataService = SongDataService();
   double? _pttDifference; // PTT差值
+  List<SongCardData> _extraBestSongs = [];
+  bool _isLoadingExtraSongs = false;
+  String? _extraSongsMessage;
 
   @override
   void initState() {
@@ -77,6 +88,10 @@ class _B30R10PageState extends State<B30R10Page> {
           _refreshWebViewAndData();
         }
       });
+    }
+
+    if (_data != null && widget.settings.extraBestSongsCount > 0) {
+      _loadExtraBestSongs();
     }
   }
 
@@ -96,6 +111,11 @@ class _B30R10PageState extends State<B30R10Page> {
           _refreshWebViewAndData();
         }
       });
+    }
+
+    if (oldWidget.settings.extraBestSongsCount !=
+        widget.settings.extraBestSongsCount) {
+      _loadExtraBestSongs();
     }
   }
 
@@ -117,6 +137,7 @@ class _B30R10PageState extends State<B30R10Page> {
       if (_data != null && mounted) {
         // 数据加载成功，对比PTT变化
         _comparePTT();
+        _loadExtraBestSongs();
         widget.imageManager.removeListener(dataListener);
         setState(() {
           _isLoading = false;
@@ -156,6 +177,7 @@ class _B30R10PageState extends State<B30R10Page> {
         if (hasData) {
           // 对比PTT变化
           await _comparePTT();
+          _loadExtraBestSongs();
         }
         setState(() {
           _isLoading = false;
@@ -205,6 +227,140 @@ class _B30R10PageState extends State<B30R10Page> {
         _pttDifference = difference;
       });
     }
+  }
+
+  Future<void> _loadExtraBestSongs() async {
+    final data = _data;
+    final extraCount = widget.settings.extraBestSongsCount;
+
+    if (data == null || extraCount <= 0) {
+      if (_extraBestSongs.isNotEmpty || _extraSongsMessage != null) {
+        if (mounted) {
+          setState(() {
+            _extraBestSongs = [];
+            _extraSongsMessage = null;
+            _isLoadingExtraSongs = false;
+          });
+        } else {
+          _extraBestSongs = [];
+          _extraSongsMessage = null;
+          _isLoadingExtraSongs = false;
+        }
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoadingExtraSongs = true;
+        _extraSongsMessage = null;
+      });
+    } else {
+      _isLoadingExtraSongs = true;
+      _extraSongsMessage = null;
+    }
+
+    try {
+      final scores = await _storageService.loadScores();
+      if (!mounted) return;
+
+      if (scores.isEmpty) {
+        setState(() {
+          _extraBestSongs = [];
+          _extraSongsMessage = '需要先在成绩列表页拉取成绩';
+          _isLoadingExtraSongs = false;
+        });
+        return;
+      }
+
+      await _songDataService.ensureLoaded();
+      final extras = _buildExtraSongsFromScores(scores, data, extraCount);
+
+      if (!mounted) return;
+      setState(() {
+        _extraBestSongs = extras;
+        if (extras.isEmpty) {
+          _extraSongsMessage = '没有找到更多的高分成绩';
+        } else if (extras.length < extraCount) {
+          _extraSongsMessage = '仅找到 ${extras.length} 首符合条件的曲目';
+        } else {
+          _extraSongsMessage = null;
+        }
+        _isLoadingExtraSongs = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _extraBestSongs = [];
+        _extraSongsMessage = '加载额外曲目失败';
+        _isLoadingExtraSongs = false;
+      });
+    }
+  }
+
+  List<SongCardData> _buildExtraSongsFromScores(
+    List<ScoreData> scores,
+    B30R10Data data,
+    int extraCount,
+  ) {
+    final Map<String, SongCardData> knownSongs = {};
+    for (final song in data.best30) {
+      knownSongs[_buildSongKey(song.songTitle, song.difficulty)] = song;
+    }
+    for (final song in data.recent10) {
+      final key = _buildSongKey(song.songTitle, song.difficulty);
+      knownSongs.putIfAbsent(key, () => song);
+    }
+
+    final Set<String> excludedKeys = data.best30
+        .map((song) => _buildSongKey(song.songTitle, song.difficulty))
+        .toSet();
+
+    final List<_ExtraSongCandidate> candidates = [];
+    for (final score in scores) {
+      final key = _buildSongKey(score.songTitle, score.difficulty);
+      if (excludedKeys.contains(key)) continue;
+
+      final reference = knownSongs[key];
+      final constant = reference?.constant ??
+          _songDataService.getConstant(score.songTitle, score.difficulty);
+      if (constant == null) continue;
+
+      final playPTT =
+          reference?.playPTT ?? _calculatePlayPTT(score.score, constant);
+      if (playPTT == null) continue;
+
+      candidates.add(
+        _ExtraSongCandidate(
+          score: score,
+          constant: constant,
+          playPTT: playPTT,
+        ),
+      );
+    }
+
+    candidates.sort((a, b) => b.playPTT.compareTo(a.playPTT));
+    final selected = candidates.take(extraCount).toList();
+
+    final extras = <SongCardData>[];
+    var rank = data.best30.length + 1;
+
+    for (final candidate in selected) {
+      extras.add(
+        SongCardData(
+          songTitle: candidate.score.songTitle,
+          difficulty: candidate.score.difficulty.toUpperCase(),
+          difficultyIndex: _parseDifficultyIndex(candidate.score.difficulty),
+          score: candidate.score.score,
+          constant: candidate.constant,
+          playPTT: candidate.playPTT,
+          coverUrl: candidate.score.albumArtUrl,
+          rank: rank++,
+        ),
+      );
+    }
+
+    return extras;
   }
 
   /// 手动重试（重置重试计数）
@@ -345,6 +501,10 @@ class _B30R10PageState extends State<B30R10Page> {
           songs: _data!.best30,
           isRecent: false,
         ),
+        if (widget.settings.extraBestSongsCount > 0) ...[
+          const SizedBox(height: 16),
+          _buildExtraBestSongsSection(),
+        ],
         const SizedBox(height: 24),
         _buildSongSection(
           title: 'Recent 10',
@@ -372,6 +532,59 @@ class _B30R10PageState extends State<B30R10Page> {
         _buildSectionHeader(title, subtitle, icon, accentColor),
         const SizedBox(height: 12),
         ...songs.map((song) => _buildSongCard(song, isRecent)),
+      ],
+    );
+  }
+
+  Widget _buildExtraBestSongsSection() {
+    final requested = widget.settings.extraBestSongsCount;
+    final effectiveCount = _extraBestSongs.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildDashedDivider(),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Text(
+              '追加曲目',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              requested > 0 ? '+$requested' : '关闭',
+              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            ),
+            const Spacer(),
+            IconButton(
+              onPressed: _isLoadingExtraSongs ? null : _loadExtraBestSongs,
+              tooltip: '重新加载追加曲目',
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+        Text(
+          effectiveCount > 0
+              ? '已追加 $effectiveCount 首曲目'
+              : '根据成绩列表缓存追加显示',
+          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 12),
+        if (_isLoadingExtraSongs)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          )
+        else if (_extraBestSongs.isNotEmpty)
+          ..._extraBestSongs.map((song) => _buildSongCard(song, false))
+        else if (_extraSongsMessage != null)
+          _buildInfoBanner(_extraSongsMessage!),
       ],
     );
   }
@@ -627,6 +840,44 @@ class _B30R10PageState extends State<B30R10Page> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDashedDivider() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const dashWidth = 6.0;
+        const dashSpace = 4.0;
+        final rawCount = (constraints.maxWidth / (dashWidth + dashSpace)).floor();
+        final dashCount = rawCount <= 0 ? 1 : rawCount;
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(dashCount, (index) {
+            return Container(
+              width: dashWidth,
+              height: 1,
+              color: Colors.grey[400],
+            );
+          }),
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoBanner(String message) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceVariant.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        message,
+        style: TextStyle(fontSize: 13, color: Colors.grey[700]),
       ),
     );
   }
@@ -1166,6 +1417,40 @@ class _B30R10PageState extends State<B30R10Page> {
     }).toList();
   }
 
+  double? _calculatePlayPTT(int score, double constant) {
+    if (score >= 10000000) {
+      return constant + 2;
+    } else if (score >= 9800000) {
+      return constant + 1 + (score - 9800000) / 200000;
+    } else if (score >= 9500000) {
+      final value = constant + (score - 9500000) / 300000;
+      return value < 0 ? 0 : value;
+    }
+    final fallback = constant + (score - 9500000) / 300000;
+    return fallback < 0 ? 0 : fallback;
+  }
+
+  int _parseDifficultyIndex(String difficulty) {
+    switch (difficulty.trim().toUpperCase()) {
+      case 'PST':
+        return 0;
+      case 'PRS':
+        return 1;
+      case 'FTR':
+        return 2;
+      case 'ETR':
+        return 3;
+      case 'BYD':
+        return 4;
+      default:
+        return 0;
+    }
+  }
+
+  String _buildSongKey(String title, String difficulty) {
+    return '${title.trim().toLowerCase()}|${difficulty.trim().toUpperCase()}';
+  }
+
   /// 显示设置对话框
   void _showSettingsDialog() {
     showSettingsDialog(
@@ -1184,6 +1469,20 @@ class _B30R10PageState extends State<B30R10Page> {
       updateStatusMessage: widget.updateStatusMessage,
       dataUpdateMessage: widget.dataUpdateMessage,
       lastDataUpdateTime: widget.lastDataUpdateTime,
+      settings: widget.settings,
+      onSettingsChanged: widget.onSettingsChanged,
     );
   }
+}
+
+class _ExtraSongCandidate {
+  final ScoreData score;
+  final double constant;
+  final double playPTT;
+
+  _ExtraSongCandidate({
+    required this.score,
+    required this.constant,
+    required this.playPTT,
+  });
 }

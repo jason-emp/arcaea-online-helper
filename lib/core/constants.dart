@@ -48,4 +48,5 @@ class AppConstants {
   static const String prefShowPTT = 'showPTT';
   static const String prefShowTargetScore = 'showTargetScore';
   static const String prefShowDownloadButtons = 'showDownloadButtons';
+  static const String prefExtraBestSongsCount = 'extraBestSongsCount';
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/app_settings.dart';
 
 /// 显示设置对话框
 Future<void> showSettingsDialog({
@@ -17,6 +18,8 @@ Future<void> showSettingsDialog({
   String? updateStatusMessage,
   String? dataUpdateMessage,
   DateTime? lastDataUpdateTime,
+  required AppSettings settings,
+  required ValueChanged<AppSettings> onSettingsChanged,
 }) async {
   return showDialog<void>(
     context: context,
@@ -35,12 +38,14 @@ Future<void> showSettingsDialog({
       updateStatusMessage: updateStatusMessage,
       dataUpdateMessage: dataUpdateMessage,
       lastDataUpdateTime: lastDataUpdateTime,
+      settings: settings,
+      onSettingsChanged: onSettingsChanged,
     ),
   );
 }
 
 /// 设置对话框Widget
-class _SettingsDialog extends StatelessWidget {
+class _SettingsDialog extends StatefulWidget {
   final VoidCallback onGenerateImage;
   final VoidCallback onDownloadLatest;
   final VoidCallback onCheckUpdate;
@@ -55,6 +60,8 @@ class _SettingsDialog extends StatelessWidget {
   final String? updateStatusMessage;
   final String? dataUpdateMessage;
   final DateTime? lastDataUpdateTime;
+  final AppSettings settings;
+  final ValueChanged<AppSettings> onSettingsChanged;
 
   const _SettingsDialog({
     required this.onGenerateImage,
@@ -71,7 +78,72 @@ class _SettingsDialog extends StatelessWidget {
     this.updateStatusMessage,
     this.dataUpdateMessage,
     this.lastDataUpdateTime,
+    required this.settings,
+    required this.onSettingsChanged,
   });
+
+  @override
+  State<_SettingsDialog> createState() => _SettingsDialogState();
+}
+
+class _SettingsDialogState extends State<_SettingsDialog> {
+  late AppSettings _settings;
+
+  @override
+  void initState() {
+    super.initState();
+    _settings = widget.settings;
+  }
+
+  Widget _buildExtraBestSongsControl() {
+    const options = [0, 5, 10, 15, 20];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '显示更多 Best 曲目',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<int>(
+          value: _settings.extraBestSongsCount,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: options
+              .map(
+                (value) => DropdownMenuItem<int>(
+                  value: value,
+                  child: Text(value == 0 ? '关闭' : '+$value'),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            if (value == null) return;
+            _updateSettings(
+              _settings.copyWith(extraBestSongsCount: value),
+            );
+          },
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '需要先在成绩列表页拉取成绩，追加曲目将显示在 B30 下方',
+          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+        ),
+      ],
+    );
+  }
+
+  void _updateSettings(AppSettings newSettings) {
+    setState(() {
+      _settings = newSettings;
+    });
+    widget.onSettingsChanged(newSettings);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -124,7 +196,7 @@ class _SettingsDialog extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     FilledButton.icon(
-                      onPressed: onDownloadLatest,
+                      onPressed: widget.onDownloadLatest,
                       icon: const Icon(Icons.download),
                       label: const Text('下载最新版本'),
                     ),
@@ -135,15 +207,17 @@ class _SettingsDialog extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     FilledButton.icon(
-                      onPressed: isCheckingUpdate ? null : onCheckUpdate,
-                      icon: isCheckingUpdate
+                      onPressed: widget.isCheckingUpdate
+                          ? null
+                          : widget.onCheckUpdate,
+                      icon: widget.isCheckingUpdate
                           ? const SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.system_update_alt),
-                      label: Text(isCheckingUpdate ? '检查中...' : '检查更新'),
+                      label: Text(widget.isCheckingUpdate ? '检查中...' : '检查更新'),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -152,9 +226,16 @@ class _SettingsDialog extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      updateStatusMessage ?? '点击"检查更新"以获取最新版本信息',
+                      widget.updateStatusMessage ?? '点击"检查更新"以获取最新版本信息',
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      '显示设置',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildExtraBestSongsControl(),
                     const SizedBox(height: 24),
                     const Text(
                       '数据管理',
@@ -162,15 +243,17 @@ class _SettingsDialog extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     FilledButton.icon(
-                      onPressed: isUpdatingData ? null : onUpdateData,
-                      icon: isUpdatingData
+                      onPressed:
+                          widget.isUpdatingData ? null : widget.onUpdateData,
+                      icon: widget.isUpdatingData
                           ? const SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.cloud_download),
-                      label: Text(isUpdatingData ? '更新中...' : '更新曲目数据'),
+                      label:
+                          Text(widget.isUpdatingData ? '更新中...' : '更新曲目数据'),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -179,7 +262,8 @@ class _SettingsDialog extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      dataUpdateMessage ?? '从 GitHub 下载最新的曲目列表和定数数据',
+                      widget.dataUpdateMessage ??
+                          '从 GitHub 下载最新的曲目列表和定数数据',
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                     const SizedBox(height: 24),
@@ -222,21 +306,21 @@ class _SettingsDialog extends StatelessWidget {
 
   String _buildVersionInfoText() {
     final parts = <String>[];
-    if (currentVersion != null) {
-      parts.add('当前版本 $currentVersion');
+    if (widget.currentVersion != null) {
+      parts.add('当前版本 ${widget.currentVersion}');
     }
-    if (latestVersion != null) {
-      parts.add('最新版本 $latestVersion');
+    if (widget.latestVersion != null) {
+      parts.add('最新版本 ${widget.latestVersion}');
     }
     return parts.isEmpty ? '当前版本信息暂不可用' : parts.join(' · ');
   }
 
   String _buildDataUpdateInfoText() {
-    if (lastDataUpdateTime == null) {
+    if (widget.lastDataUpdateTime == null) {
       return '尚未更新过数据';
     }
     final now = DateTime.now();
-    final diff = now.difference(lastDataUpdateTime!);
+    final diff = now.difference(widget.lastDataUpdateTime!);
     
     if (diff.inDays > 0) {
       return '上次更新: ${diff.inDays} 天前';
@@ -273,7 +357,7 @@ class _SettingsDialog extends StatelessWidget {
             onPressed: () {
               Navigator.of(dialogContext).pop(); // 关闭确认对话框
               Navigator.of(context).pop(); // 关闭设置对话框
-              onClearAllData(); // 执行清除操作
+              widget.onClearAllData(); // 执行清除操作
             },
             style: FilledButton.styleFrom(
               backgroundColor: Colors.red,

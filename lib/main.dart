@@ -72,6 +72,7 @@ class _MainTabPageState extends State<MainTabPage> {
   bool _lastLoginState = false;
   bool _showWebView = false; // 控制是否显示 WebView
   late final ImageGenerationManager _imageManager;
+  AppSettings _appSettings = AppSettings();
 
   @override
   void initState() {
@@ -79,6 +80,18 @@ class _MainTabPageState extends State<MainTabPage> {
     _imageManager = ImageGenerationManager();
     // 启动时尝试从缓存加载 B30 数据
     _imageManager.loadFromCache();
+    _loadAppSettings();
+  }
+
+  Future<void> _loadAppSettings() async {
+    final settings = await AppSettings.load();
+    if (mounted) {
+      setState(() {
+        _appSettings = settings;
+      });
+    } else {
+      _appSettings = settings;
+    }
   }
 
   void _navigateToWebView() {
@@ -151,6 +164,24 @@ class _MainTabPageState extends State<MainTabPage> {
     }
   }
 
+  Future<void> _handleSettingsChanged(AppSettings newSettings) async {
+    setState(() {
+      _appSettings = newSettings;
+    });
+    try {
+      await newSettings.save();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('保存设置失败: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   void _launchLatestRelease() {
     _webViewKey.currentState?._launchLatestRelease();
   }
@@ -205,8 +236,15 @@ class _MainTabPageState extends State<MainTabPage> {
               updateStatusMessage: webViewState?._updateStatusMessage,
               dataUpdateMessage: webViewState?._dataUpdateMessage,
               lastDataUpdateTime: webViewState?._lastDataUpdateTime,
+              settings: _appSettings,
+              onSettingsChanged: _handleSettingsChanged,
             ),
-            ArcaeaWebViewPage(key: _webViewKey, imageManager: _imageManager),
+            ArcaeaWebViewPage(
+              key: _webViewKey,
+              imageManager: _imageManager,
+              settings: _appSettings,
+              onSettingsChanged: _handleSettingsChanged,
+            ),
             scoreListPage,
           ]
         : [
@@ -229,9 +267,16 @@ class _MainTabPageState extends State<MainTabPage> {
               updateStatusMessage: webViewState?._updateStatusMessage,
               dataUpdateMessage: webViewState?._dataUpdateMessage,
               lastDataUpdateTime: webViewState?._lastDataUpdateTime,
+              settings: _appSettings,
+              onSettingsChanged: _handleSettingsChanged,
             ),
             scoreListPage,
-            ArcaeaWebViewPage(key: _webViewKey, imageManager: _imageManager), // 保持在列表中以维持状态
+            ArcaeaWebViewPage(
+              key: _webViewKey,
+              imageManager: _imageManager,
+              settings: _appSettings,
+              onSettingsChanged: _handleSettingsChanged,
+            ), // 保持在列表中以维持状态
           ];
     
     return Scaffold(
@@ -298,8 +343,15 @@ class _MainTabPageState extends State<MainTabPage> {
 
 class ArcaeaWebViewPage extends StatefulWidget {
   final ImageGenerationManager imageManager;
+  final AppSettings settings;
+  final ValueChanged<AppSettings> onSettingsChanged;
   
-  const ArcaeaWebViewPage({super.key, required this.imageManager});
+  const ArcaeaWebViewPage({
+    super.key,
+    required this.imageManager,
+    required this.settings,
+    required this.onSettingsChanged,
+  });
 
   @override
   State<ArcaeaWebViewPage> createState() => _ArcaeaWebViewPageState();
@@ -318,9 +370,6 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   ImageGenerationManager get _imageManager => widget.imageManager;
   late final UpdateService _updateService;
   late final DataUpdateService _dataUpdateService;
-
-  // 默认设置（用于WebView）
-  final AppSettings _settings = AppSettings();
 
   // 更新检查状态
   bool _isCheckingUpdate = false;
@@ -735,7 +784,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
 
       _scriptManager.startAggressiveInjectionLoop(
         controller,
-        _settings,
+        widget.settings,
         reason: 'reload',
         forceRestart: true,
       );
@@ -772,7 +821,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
 
         _scriptManager.startAggressiveInjectionLoop(
           controller,
-          _settings,
+          widget.settings,
           reason: 'updateVisitedHistory',
           forceRestart: true,
         );
@@ -805,7 +854,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
 
       _scriptManager.startAggressiveInjectionLoop(
         controller,
-        _settings,
+        widget.settings,
         reason: 'loadStop',
         forceRestart: true,
       );
@@ -823,7 +872,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
       } else {
         _scriptManager.startAggressiveInjectionLoop(
           controller,
-          _settings,
+          widget.settings,
           reason: 'resource',
         );
       }
@@ -955,6 +1004,8 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
       updateStatusMessage: _updateStatusMessage,
       dataUpdateMessage: _dataUpdateMessage,
       lastDataUpdateTime: _lastDataUpdateTime,
+      settings: widget.settings,
+      onSettingsChanged: widget.onSettingsChanged,
     );
   }
 
