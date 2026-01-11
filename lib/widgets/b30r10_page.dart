@@ -70,7 +70,8 @@ class _B30R10PageState extends State<B30R10Page> {
       _isLoading = true;
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
-          _refresh();
+          // 启动时也先刷新WebView页面,确保获取最新数据
+          _refreshWebViewAndData();
         }
       });
     }
@@ -88,7 +89,8 @@ class _B30R10PageState extends State<B30R10Page> {
       _retryCount = 0;
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {
-          _refresh();
+          // 登录后也先刷新页面再获取数据
+          _refreshWebViewAndData();
         }
       });
     }
