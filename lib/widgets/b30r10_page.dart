@@ -98,8 +98,6 @@ class _B30R10PageState extends State<B30R10Page> {
 
   /// 刷新数据（带重试机制）
   Future<void> _refresh() async {
-    debugPrint('[B30R10Page] 开始刷新，ImageManager实例: ${widget.imageManager.hashCode}');
-    
     setState(() {
       _isLoading = true;
       _loadFailed = false;
@@ -109,14 +107,12 @@ class _B30R10PageState extends State<B30R10Page> {
     void dataListener() {
       if (_data != null && mounted) {
         // 数据加载成功
-        debugPrint('[B30R10Page] 监听器检测到数据: ${_data!.player.username}');
         widget.imageManager.removeListener(dataListener);
         setState(() {
           _isLoading = false;
           _loadFailed = false;
           _retryCount = 0;
         });
-        debugPrint('[B30R10Page] 数据加载成功');
       }
     }
     
@@ -133,12 +129,10 @@ class _B30R10PageState extends State<B30R10Page> {
       
       // 检查是否成功加载数据
       final hasData = _data != null;
-      debugPrint('[B30R10Page] 等待结束，检查数据: hasData=$hasData, ImageManager实例: ${widget.imageManager.hashCode}, cachedData=${widget.imageManager.cachedData != null ? widget.imageManager.cachedData!.player.username : "null"}');
 
       if (!hasData && _retryCount < _maxRetries) {
         // 数据加载失败且还有重试次数
         _retryCount++;
-        debugPrint('[B30R10Page] 数据加载失败，尝试第 $_retryCount 次重试...');
 
         // 等待1秒后重试
         await Future.delayed(const Duration(milliseconds: 1000));
@@ -155,13 +149,9 @@ class _B30R10PageState extends State<B30R10Page> {
             // 所有重试都失败
             if (!widget.isLoggedIn) {
               _loadFailed = true;
-              debugPrint('[B30R10Page] 数据加载失败: 未登录');
-            } else {
-              debugPrint('[B30R10Page] 数据加载失败: 已重试 $_retryCount 次');
             }
             _retryCount = 0; // 重置重试计数
           } else {
-            debugPrint('[B30R10Page] 数据加载成功');
             _retryCount = 0;
             _loadFailed = false;
           }

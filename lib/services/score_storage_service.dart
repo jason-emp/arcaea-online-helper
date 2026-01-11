@@ -30,10 +30,7 @@ class ScoreStorageService {
       await prefs.setString(_scoresKey, jsonString);
       await prefs.setString(_lastUpdateKey, DateTime.now().toIso8601String());
       await prefs.setInt(_totalCountKey, deduplicatedScores.length);
-      
-      print('[ScoreStorage] 已保存 ${deduplicatedScores.length} 条成绩');
     } catch (e) {
-      print('[ScoreStorage] 保存失败: $e');
       rethrow;
     }
   }
@@ -71,7 +68,6 @@ class ScoreStorageService {
       final jsonString = prefs.getString(_scoresKey);
       
       if (jsonString == null || jsonString.isEmpty) {
-        print('[ScoreStorage] 没有缓存的成绩数据');
         return [];
       }
       
@@ -79,10 +75,8 @@ class ScoreStorageService {
       final List<dynamic> jsonList = jsonDecode(jsonString);
       final scores = jsonList.map((json) => ScoreData.fromJson(json)).toList();
       
-      print('[ScoreStorage] 已加载 ${scores.length} 条成绩');
       return scores;
     } catch (e) {
-      print('[ScoreStorage] 加载失败: $e');
       return [];
     }
   }
@@ -99,7 +93,6 @@ class ScoreStorageService {
       
       return DateTime.parse(timeString);
     } catch (e) {
-      print('[ScoreStorage] 获取更新时间失败: $e');
       return null;
     }
   }
@@ -110,7 +103,6 @@ class ScoreStorageService {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getInt(_totalCountKey) ?? 0;
     } catch (e) {
-      print('[ScoreStorage] 获取总数失败: $e');
       return 0;
     }
   }
@@ -123,10 +115,7 @@ class ScoreStorageService {
       await prefs.remove(_lastUpdateKey);
       await prefs.remove(_totalCountKey);
       await prefs.remove(_playerPTTKey);
-      
-      print('[ScoreStorage] 缓存已清除');
     } catch (e) {
-      print('[ScoreStorage] 清除缓存失败: $e');
       rethrow;
     }
   }
@@ -141,10 +130,7 @@ class ScoreStorageService {
       await prefs.remove(_playerPTTKey);
       await prefs.remove(_sortOptionKey);
       await prefs.remove(_b30DataKey);
-      
-      print('[ScoreStorage] 所有数据已清除');
     } catch (e) {
-      print('[ScoreStorage] 清除所有数据失败: $e');
       rethrow;
     }
   }
@@ -181,10 +167,7 @@ class ScoreStorageService {
       
       final mergedScores = scoreMap.values.toList();
       await saveScores(mergedScores);
-      
-      print('[ScoreStorage] 已追加成绩，总数: ${mergedScores.length}');
     } catch (e) {
-      print('[ScoreStorage] 追加成绩失败: $e');
       rethrow;
     }
   }
@@ -224,9 +207,7 @@ class ScoreStorageService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_sortOptionKey, option.name);
-      print('[ScoreStorage] 已保存排序选项: ${option.label}');
     } catch (e) {
-      print('[ScoreStorage] 保存排序选项失败: $e');
     }
   }
 
@@ -242,7 +223,6 @@ class ScoreStorageService {
       
       return ScoreSortOption.fromString(optionName);
     } catch (e) {
-      print('[ScoreStorage] 加载排序选项失败: $e');
       return ScoreSortOption.dateDescending;
     }
   }
@@ -253,9 +233,7 @@ class ScoreStorageService {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = jsonEncode(data.toJson());
       await prefs.setString(_b30DataKey, jsonString);
-      print('[ScoreStorage] 已保存 B30/R10 数据');
     } catch (e) {
-      print('[ScoreStorage] 保存 B30/R10 数据失败: $e');
     }
   }
 
@@ -272,7 +250,6 @@ class ScoreStorageService {
       final Map<String, dynamic> jsonData = jsonDecode(jsonString);
       return B30R10Data.fromJson(jsonData);
     } catch (e) {
-      print('[ScoreStorage] 加载 B30/R10 数据失败: $e');
       return null;
     }
   }

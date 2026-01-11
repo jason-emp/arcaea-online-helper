@@ -28,8 +28,11 @@ void main() async {
 
   // 捕获全局错误
   FlutterError.onError = (FlutterErrorDetails details) {
-    debugPrint('Flutter错误: ${details.exception}');
-    debugPrint('堆栈: ${details.stack}');
+    // 在调试模式下记录错误
+    if (kDebugMode) {
+      debugPrint('Flutter错误: ${details.exception}');
+      debugPrint('堆栈: ${details.stack}');
+    }
   };
 
   runApp(const ArcaeaHelperApp());
@@ -340,7 +343,6 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     _dataUpdateService = DataUpdateService();
     _scriptManager = WebViewScriptManager(
       onB30R10DataReceived: _handleB30R10Data,
-      onDebugMessage: (message) => debugPrint('[ScriptManager] $message'),
     );
 
     // 异步初始化
@@ -535,11 +537,9 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
       if (webViewController != null) {
         final cookieManager = CookieManager.instance();
         await cookieManager.deleteAllCookies();
-        debugPrint('[清除数据] 已清除所有 Cookies');
         
         // 清除 WebView 缓存
         await webViewController!.clearCache();
-        debugPrint('[清除数据] 已清除 WebView 缓存');
       }
       
       // 4. 重置脚本管理器状态
@@ -574,8 +574,6 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
 
   void _handleB30R10Data(B30R10Data data) {
     _imageManager.cachedData = data;
-    debugPrint('[Arcaea Helper] 数据已缓存: ${data.player.username}, ImageManager实例: ${_imageManager.hashCode}');
-    debugPrint('[Arcaea Helper] 验证缓存: ${_imageManager.cachedData != null ? _imageManager.cachedData!.player.username : "null"}');
 
     if (mounted) {
       _showSnackBar('数据已准备: ${data.player.username}');
@@ -586,10 +584,11 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     if (webViewController == null) return;
 
     try {
-      debugPrint('[Arcaea Helper] 开始获取B30/R10数据...');
       await _scriptManager.exportB30R10Data(webViewController!);
     } catch (e, stackTrace) {
-      debugPrint('[Arcaea Helper] 获取数据失败: $e\n堆栈: $stackTrace');
+      if (kDebugMode) {
+        debugPrint('[Arcaea Helper] 获取数据失败: $e\n堆栈: $stackTrace');
+      }
       if (mounted) {
         _showSnackBar('获取数据失败: $e');
       }
@@ -630,7 +629,9 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
         );
       }
     } catch (e, stackTrace) {
-      debugPrint('[Arcaea Helper] 生成图片失败: $e\n堆栈: $stackTrace');
+      if (kDebugMode) {
+        debugPrint('[Arcaea Helper] 生成图片失败: $e\n堆栈: $stackTrace');
+      }
 
       if (mounted) {
         _showSnackBar('生成图片失败: $e');
@@ -665,14 +666,12 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   }
 
   void _onLoadStart(InAppWebViewController controller, WebUri? url) {
-    debugPrint('[WebView] 开始加载: $url');
     final rawUrl = url?.toString();
     final wasTargetPage = _scriptManager.state.isTargetPage;
     final isTarget = _scriptManager.isTargetUrl(rawUrl);
 
     // 如果是目标页面的加载开始,立即重置注入状态
     if (isTarget) {
-      debugPrint('[Arcaea Helper] 检测到目标页面开始加载，重置注入状态');
       _scriptManager.state.hasInjectedScript = false;
       _scriptManager.state.hasTriggeredProcessing = false;
       _scriptManager.state.aggressiveAttempts = 0;
@@ -682,7 +681,6 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     }
     // 如果从目标页离开,设置宽限期
     else if (wasTargetPage && !isTarget) {
-      debugPrint('[Arcaea Helper] 检测到离开目标页面，设置宽限期');
       _scriptManager.state.isTargetPage = false;
       _scriptManager.startTargetPageGraceTimer(() {
         if (mounted) {
@@ -691,7 +689,6 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
       });
     } else if (!wasTargetPage && isTarget) {
       _scriptManager.cancelTargetPageGraceTimer();
-      debugPrint('[Arcaea Helper] 回到目标页面，取消宽限期');
       _scriptManager.state.isTargetPage = true;
     }
 
@@ -715,11 +712,8 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     final urlString = url?.toString() ?? '';
     final isTarget = _scriptManager.isTargetUrl(urlString);
 
-    debugPrint('[WebView] onUpdateVisitedHistory - url=$urlString, isReload=$isReload, isTarget=$isTarget');
-
     // 如果是刷新操作且是目标页面,强制重新注入
     if (isReload == true && isTarget) {
-      debugPrint('[Arcaea Helper] 检测到页面刷新,强制重置并重新注入');
       _scriptManager.state.hasInjectedScript = false;
       _scriptManager.state.hasTriggeredProcessing = false;
       _scriptManager.state.aggressiveAttempts = 0;
@@ -757,14 +751,12 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
           now.difference(_scriptManager.state.lastTargetPageTime!) < AppConstants.targetPageGracePeriod;
 
       if (!_scriptManager.state.isTargetPage || isQuickReturn) {
-        debugPrint('[Arcaea Helper] URL变为目标页面，准备注入 (快速返回: $isQuickReturn)');
         _scriptManager.state.isTargetPage = true;
         setState(() {
           currentUrl = urlString;
         });
 
         if (isQuickReturn) {
-          debugPrint('[Arcaea Helper] 快速返回场景,重置注入状态');
           _scriptManager.state.hasInjectedScript = false;
           _scriptManager.state.hasTriggeredProcessing = false;
           _scriptManager.state.aggressiveAttempts = 0;
@@ -786,7 +778,6 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
         );
       }
     } else if (!isTarget && _scriptManager.state.isTargetPage) {
-      debugPrint('[Arcaea Helper] 离开目标页面，等待宽限期');
       _scriptManager.startTargetPageGraceTimer(() {
         // 宽限期处理在startTargetPageGraceTimer中
       });
@@ -795,22 +786,18 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
 
   Future<void> _onLoadStop(InAppWebViewController controller, WebUri? url) async {
     final urlString = url?.toString() ?? '';
-    debugPrint('[WebView] 加载完成: $urlString');
 
     setState(() {
       progress = 1.0;
     });
 
     final isTarget = _scriptManager.isTargetUrl(urlString);
-    debugPrint('[Arcaea Helper] onLoadStop - isTarget=$isTarget');
     _scriptManager.state.isTargetPage = isTarget;
 
     if (isTarget) {
-      debugPrint('[Arcaea Helper] 检测到目标页面，延迟后开始注入');
       await Future.delayed(AppConstants.initialDelay);
 
       final domReady = await _scriptManager.checkDOMReady(controller);
-      debugPrint('[Arcaea Helper] DOM就绪状态: $domReady');
 
       if (!domReady) {
         await Future.delayed(AppConstants.domCheckDelay);
@@ -823,7 +810,6 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
         forceRestart: true,
       );
     } else {
-      debugPrint('[Arcaea Helper] 非目标页面，停止注入循环');
       _scriptManager.stopAggressiveLoop();
     }
   }
@@ -831,9 +817,6 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   void _onLoadResource(InAppWebViewController controller, LoadedResource resource) {
     final resourceUrl = resource.url?.toString() ?? '';
     if (_scriptManager.isTargetUrl(resourceUrl)) {
-      if (!_scriptManager.state.isTargetPage) {
-        debugPrint('[WebView] 资源阶段检测到目标页面: $resourceUrl');
-      }
       _scriptManager.state.isTargetPage = true;
       if (_scriptManager.state.aggressiveLoopActive) {
         _scriptManager.state.aggressiveAttempts = 0;
@@ -848,7 +831,10 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   }
 
   void _onConsoleMessage(InAppWebViewController controller, ConsoleMessage consoleMessage) {
-    debugPrint('[WebView Console] ${consoleMessage.messageLevel}: ${consoleMessage.message}');
+    // 在调试模式下记录控制台消息
+    if (kDebugMode) {
+      debugPrint('[WebView Console] ${consoleMessage.messageLevel}: ${consoleMessage.message}');
+    }
   }
 
   void _onReceivedError(
@@ -856,7 +842,9 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     WebResourceRequest request,
     WebResourceError error,
   ) {
-    debugPrint('[WebView Error] URL: ${request.url}, Error: ${error.description}, Type: ${error.type}');
+    if (kDebugMode) {
+      debugPrint('[WebView Error] URL: ${request.url}, Error: ${error.description}, Type: ${error.type}');
+    }
     _scriptManager.stopAggressiveLoop();
   }
 
@@ -865,7 +853,9 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     WebResourceRequest request,
     WebResourceResponse response,
   ) {
-    debugPrint('[WebView HTTP Error] URL: ${request.url}, Status: ${response.statusCode}');
+    if (kDebugMode) {
+      debugPrint('[WebView HTTP Error] URL: ${request.url}, Status: ${response.statusCode}');
+    }
     final statusCode = response.statusCode;
     if (statusCode != null && statusCode >= 400) {
       _scriptManager.stopAggressiveLoop();
@@ -992,7 +982,6 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
       onReceivedError: _onReceivedError,
       onReceivedHttpError: _onReceivedHttpError,
       shouldOverrideUrlLoading: (controller, navigationAction) async {
-        debugPrint('[WebView] 导航请求: ${navigationAction.request.url}');
         return NavigationActionPolicy.ALLOW;
       },
     );

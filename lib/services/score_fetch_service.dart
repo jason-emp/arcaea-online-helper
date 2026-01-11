@@ -34,7 +34,6 @@ class ScoreFetchService {
     final completer = Completer<InAppWebViewController>();
     const url = 'https://arcaea.lowiro.com/zh/profile/scores?page=1';
 
-    print('[ScoreFetch] 正在初始化 WebView...');
     _headlessWebView = HeadlessInAppWebView(
       initialUrlRequest: URLRequest(url: WebUri(url)),
       initialSettings: InAppWebViewSettings(
@@ -44,13 +43,11 @@ class ScoreFetchService {
       ),
       onLoadStop: (controller, url) async {
         if (!completer.isCompleted) {
-          print('[ScoreFetch] WebView 页面加载完成: $url');
           completer.complete(controller);
         }
       },
       onLoadError: (controller, url, code, message) {
         if (!completer.isCompleted) {
-          print('[ScoreFetch] WebView 加载错误: $message');
           completer.completeError('页面加载失败: $message');
         }
       },
@@ -68,7 +65,6 @@ class ScoreFetchService {
   /// 清理 WebView
   Future<void> _cleanupWebView() async {
     if (_headlessWebView != null) {
-      print('[ScoreFetch] 正在清理 WebView...');
       await _headlessWebView!.dispose();
       _headlessWebView = null;
     }
@@ -93,11 +89,9 @@ class ScoreFetchService {
       // 加载已有成绩的日期集合
       final existingScores = await _storageService.loadScores();
       _existingDates = existingScores.map((s) => s.obtainedDate).toSet();
-      print('[ScoreFetch] 增量更新模式，已有 ${_existingDates.length} 个不同的日期');
 
       // 确定要更新的难度列表
       final targetDifficulties = difficulties ?? _difficulties;
-      print('[ScoreFetch] 将更新以下难度: ${targetDifficulties.join(", ")}');
 
       // 初始化 WebView
       final controller = await _initializeWebView();
@@ -110,11 +104,8 @@ class ScoreFetchService {
         final diffIndex = _difficulties.indexOf(difficulty);
 
         if (diffIndex == -1) {
-          print('[ScoreFetch] 跳过未知难度: $difficulty');
           continue;
         }
-
-        print('[ScoreFetch] 增量更新难度: $difficulty');
 
         // 发送当前难度信息
         _difficultyStreamController.add(difficulty);
@@ -128,21 +119,13 @@ class ScoreFetchService {
           targetDifficulties.length,
         );
 
-        if (difficultyScores.isEmpty) {
-          print('[ScoreFetch] 难度 $difficulty 没有新成绩');
-        } else {
-          print(
-            '[ScoreFetch] 难度 $difficulty 共拉取 ${difficultyScores.length} 条新成绩',
-          );
-
+        if (difficultyScores.isNotEmpty) {
           // 追加新成绩（使用存储服务的合并去重功能）
           await _storageService.appendScores(difficultyScores);
 
           // 重新加载所有成绩以更新UI
           _allScores = await _storageService.loadScores();
         }
-
-        print('[ScoreFetch] 难度 $difficulty 增量更新完成');
 
         // 难度之间延迟（减少延迟以节约时间）
         if (i < targetDifficulties.length - 1 && _isFetching) {
@@ -154,7 +137,6 @@ class ScoreFetchService {
       _isUpdateMode = false;
       _existingDates.clear();
       _progressStreamController.add(-1); // 完成标记
-      print('[ScoreFetch] 所有难度增量更新完成，总计 ${_allScores.length} 条成绩');
     } catch (e) {
       _isFetching = false;
       _isUpdateMode = false;
@@ -189,7 +171,6 @@ class ScoreFetchService {
         if (!_isFetching) break;
 
         final difficulty = _difficulties[diffIndex];
-        print('[ScoreFetch] 开始拉取难度: $difficulty');
 
         // 发送当前难度信息
         _difficultyStreamController.add(difficulty);
@@ -203,27 +184,14 @@ class ScoreFetchService {
           _difficulties.length,
         );
 
-        if (difficultyScores.isEmpty) {
-          print('[ScoreFetch] 难度 $difficulty 没有成绩数据');
-        } else {
-          print(
-            '[ScoreFetch] 难度 $difficulty 共拉取 ${difficultyScores.length} 条成绩',
-          );
-
+        if (difficultyScores.isNotEmpty) {
           // 添加前先去重（防止与已有成绩重复）
-          final beforeCount = _allScores.length;
           _allScores.addAll(difficultyScores);
           _allScores = _deduplicateScores(_allScores);
-          final afterCount = _allScores.length;
-          final addedCount = afterCount - beforeCount;
-
-          print('[ScoreFetch] 去重后实际新增 $addedCount 条成绩（总计 $afterCount 条）');
 
           // 保存到本地存储
           await _storageService.saveScores(_allScores);
         }
-
-        print('[ScoreFetch] 难度 $difficulty 拉取完成');
 
         // 难度之间延迟（减少延迟以节约时间）
         if (diffIndex < _difficulties.length - 1 && _isFetching) {
@@ -237,7 +205,6 @@ class ScoreFetchService {
 
       _isFetching = false;
       _progressStreamController.add(-1); // 完成标记
-      print('[ScoreFetch] 所有难度拉取完成，去重后总计 ${_allScores.length} 条成绩');
     } catch (e) {
       _isFetching = false;
       _errorStreamController.add('拉取错误: $e');
@@ -275,14 +242,7 @@ class ScoreFetchService {
       }
     }
 
-    final deduplicated = scoreMap.values.toList();
-    if (deduplicated.length < scores.length) {
-      print(
-        '[ScoreFetch] 去重：${scores.length} 条 -> ${deduplicated.length} 条（移除 ${scores.length - deduplicated.length} 条重复，保留最高分）',
-      );
-    }
-
-    return deduplicated;
+    return scoreMap.values.toList();
   }
 
   /// 从URL中提取page参数的值
@@ -296,7 +256,7 @@ class ScoreFetchService {
         return int.tryParse(pageParam);
       }
     } catch (e) {
-      print('[ScoreFetch] 解析URL失败: $e');
+      // 忽略解析错误
     }
 
     return null;
@@ -313,8 +273,6 @@ class ScoreFetchService {
     var allDifficultyScores = <ScoreData>[];
 
     try {
-      print('[ScoreFetch] 开始处理难度: $difficulty');
-
       // 等待DOM元素出现
       bool domReady = false;
       for (int i = 0; i < 15; i++) {
@@ -336,7 +294,6 @@ class ScoreFetchService {
       }
 
       if (!domReady) {
-        print('[ScoreFetch] DOM未就绪或未登录');
         return [];
       }
 
@@ -360,7 +317,6 @@ class ScoreFetchService {
       );
 
       if (clickResult == false) {
-        print('[ScoreFetch] 切换难度失败');
         return [];
       }
 
@@ -379,8 +335,6 @@ class ScoreFetchService {
       int consecutiveFailedUpdates = 0;
 
       while (hasMore && _isFetching) {
-        print('[ScoreFetch] 拉取难度 $difficulty 第 $currentPage 页');
-
         // 更新进度
         final progress =
             (currentStep + (currentPage / 20.0).clamp(0.0, 0.95)) / totalSteps;
@@ -519,7 +473,6 @@ class ScoreFetchService {
               }
             }
           } catch (e) {
-            print('[ScoreFetch] 解析错误: $e');
             hasMore = false;
           }
         } else {
@@ -529,7 +482,6 @@ class ScoreFetchService {
 
       return allDifficultyScores;
     } catch (e) {
-      print('[ScoreFetch] 拉取难度 $difficulty 错误: $e');
       return allDifficultyScores;
     }
   }
@@ -551,7 +503,6 @@ class ScoreFetchService {
       final result = await controller.evaluateJavascript(source: titleScript);
       return result?.toString() ?? '';
     } catch (e) {
-      print('[ScoreFetch] 获取第一首歌标题错误: $e');
       return '';
     }
   }
@@ -612,7 +563,6 @@ class ScoreFetchService {
       final result = await controller.evaluateJavascript(source: clickScript);
       return result == true;
     } catch (e) {
-      print('[ScoreFetch] 点击翻页按钮错误: $e');
       return false;
     }
   }

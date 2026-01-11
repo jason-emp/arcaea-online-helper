@@ -102,7 +102,6 @@ class _ScoreListPageState extends State<ScoreListPage> {
 
   void _validateB30Data() {
     if (_b30Data == null) {
-      debugPrint('[ScoreListPage] 页面激活，B30数据为空，尝试从缓存加载');
       widget.imageManager?.loadFromCache();
     }
   }
@@ -177,7 +176,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
         });
       }
     } catch (e) {
-      debugPrint('加载定数数据失败: $e');
+      // 忽略加载错误
     }
   }
 
@@ -221,7 +220,6 @@ class _ScoreListPageState extends State<ScoreListPage> {
         });
       }
     } catch (e) {
-      print('加载缓存失败: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;

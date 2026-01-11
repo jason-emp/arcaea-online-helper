@@ -152,14 +152,11 @@ class ImageGeneratorService {
         if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
           final codec = await ui.instantiateImageCodec(response.bodyBytes);
           final frame = await codec.getNextFrame();
-          debugPrint('[ImageGenerator] ✓ 图片加载成功: ${url.split('/').last}');
           return frame.image;
-        } else {
-          debugPrint('[ImageGenerator] ✗ HTTP ${response.statusCode}: ${url.split('/').last}');
         }
       }
     } catch (e) {
-      debugPrint('[ImageGenerator] ✗ 加载失败: ${url.split('/').last} - $e');
+      // 忽略加载错误
     }
     return null;
   }
@@ -530,7 +527,6 @@ class ImageGeneratorService {
     Function(String)? onProgress,
   }) async {
     onProgress?.call('正在初始化画布...');
-    debugPrint('[ImageGenerator] 开始生成图片: B30=${data.best30.length}, R10=${data.recent10.length}');
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
@@ -559,11 +555,6 @@ class ImageGeneratorService {
       
       if (randomSong.coverUrl != null) {
         backgroundImage = await loadImageSafe(randomSong.coverUrl);
-        if (backgroundImage != null) {
-          debugPrint('[ImageGenerator] 背景图片已加载: ${randomSong.songTitle}');
-        } else {
-          debugPrint('[ImageGenerator] 无法加载曲绘: ${randomSong.songTitle}，使用纯色背景');
-        }
       }
     }
 
@@ -658,7 +649,6 @@ class ImageGeneratorService {
         }
       }
     }
-    debugPrint('[ImageGenerator] 已加载 ${covers.length}/${taskIndex} 张曲绘');
 
     // 绘制 Best 30
     for (int i = 0; i < data.best30.length; i++) {

@@ -496,7 +496,6 @@ class WebViewScriptManager {
   }
 
   void _log(String message) {
-    debugPrint('[Arcaea Helper] $message');
     onDebugMessage?.call(message);
   }
 }
