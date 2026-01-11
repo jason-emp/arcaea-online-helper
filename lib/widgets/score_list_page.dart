@@ -392,6 +392,99 @@ class _ScoreListPageState extends State<ScoreListPage> {
     }).toList();
   }
 
+  /// 解析日期字符串，支持多种格式
+  DateTime? _parseDate(String dateStr) {
+    if (dateStr.isEmpty) return null;
+
+    // 先判断日期格式的类型，避免 yyyy/M/d 被误解析为儒略日
+    final bool usesSlash = dateStr.contains('/');
+    final bool usesDash = dateStr.contains('-');
+    final bool hasTime = dateStr.contains(':');
+
+    // 根据分隔符和是否有时间来选择格式
+    List<String> formats;
+
+    if (usesSlash && !usesDash) {
+      // 斜杠格式
+      final parts = dateStr.split(RegExp(r'[/\s:]'));
+      if (parts.isNotEmpty && parts[0].length == 4) {
+        // yyyy/M/d 格式（年份在前）
+        if (hasTime) {
+          formats = [
+            'yyyy/MM/dd HH:mm', // 2024/01/15 13:45
+            'yyyy/MM/dd H:mm', // 2024/01/15 1:45
+            'yyyy/M/d HH:mm', // 2024/1/15 13:45
+            'yyyy/M/d H:mm', // 2024/1/15 1:45
+          ];
+        } else {
+          formats = [
+            'yyyy/MM/dd', // 2024/01/15
+            'yyyy/M/d', // 2024/1/15
+          ];
+        }
+      } else {
+        // M/d/yyyy 格式（月份在前）
+        if (hasTime) {
+          formats = [
+            'M/d/yyyy HH:mm', // 1/15/2024 13:45
+            'M/d/yyyy H:mm', // 1/15/2024 1:45
+          ];
+        } else {
+          formats = ['M/d/yyyy']; // 1/15/2024
+        }
+      }
+    } else if (usesDash && !usesSlash) {
+      // 破折号格式
+      if (hasTime) {
+        formats = [
+          'yyyy-MM-dd HH:mm', // 2024-01-15 13:45
+          'yyyy-MM-dd H:mm', // 2024-01-15 1:45
+          'yyyy-M-d HH:mm', // 2024-1-15 13:45
+          'yyyy-M-d H:mm', // 2024-1-15 1:45
+        ];
+      } else {
+        formats = [
+          'yyyy-MM-dd', // 2024-01-15
+          'yyyy-M-d', // 2024-1-15
+        ];
+      }
+    } else {
+      // 混合格式或其他情况，尝试所有格式
+      formats = [
+        'M/d/yyyy HH:mm',
+        'M/d/yyyy H:mm',
+        'M/d/yyyy',
+        'yyyy-MM-dd HH:mm',
+        'yyyy-MM-dd H:mm',
+        'yyyy-MM-dd',
+        'yyyy-M-d HH:mm',
+        'yyyy-M-d H:mm',
+        'yyyy-M-d',
+        'yyyy/MM/dd HH:mm',
+        'yyyy/MM/dd H:mm',
+        'yyyy/MM/dd',
+        'yyyy/M/d HH:mm',
+        'yyyy/M/d H:mm',
+        'yyyy/M/d',
+      ];
+    }
+
+    // 尝试解析
+    for (final format in formats) {
+      try {
+        final date = DateFormat(format).parseStrict(dateStr);
+        // 验证解析结果的合理性（年份应该在1900-2100之间）
+        if (date.year >= 1900 && date.year <= 2100) {
+          return date;
+        }
+      } catch (e) {
+        // 继续尝试下一个格式
+      }
+    }
+
+    return null; // 所有格式都失败
+  }
+
   /// 排序成绩列表
   List<ScoreData> _sortScores(List<ScoreData> scores, ScoreSortOption option) {
     final sorted = List<ScoreData>.from(scores);
@@ -400,22 +493,20 @@ class _ScoreListPageState extends State<ScoreListPage> {
       case ScoreSortOption.dateDescending:
         // 按日期倒序（最新在前）
         sorted.sort((a, b) {
-          try {
-            // 日期格式: M/D/YYYY HH:mm
-            final dateA = DateFormat('M/d/yyyy HH:mm').parse(a.obtainedDate);
-            final dateB = DateFormat('M/d/yyyy HH:mm').parse(b.obtainedDate);
-            return dateB.compareTo(dateA);
-          } catch (e) {
-            // 如果解析失败，尝试使用 yyyy/M/d 格式
-            try {
-              final dateA = DateFormat('yyyy/M/d HH:mm').parse(a.obtainedDate);
-              final dateB = DateFormat('yyyy/M/d HH:mm').parse(b.obtainedDate);
-              return dateB.compareTo(dateA);
-            } catch (e2) {
-              // 最后才使用字符串比较作为后备方案
-              return b.obtainedDate.compareTo(a.obtainedDate);
-            }
+          final dateA = _parseDate(a.obtainedDate);
+          final dateB = _parseDate(b.obtainedDate);
+
+          // 如果两个日期都解析失败，使用字符串比较
+          if (dateA == null && dateB == null) {
+            return b.obtainedDate.compareTo(a.obtainedDate);
           }
+          // 如果A解析失败，A排后面
+          if (dateA == null) return 1;
+          // 如果B解析失败，B排后面
+          if (dateB == null) return -1;
+
+          // 两个日期都解析成功，按日期比较（倒序）
+          return dateB.compareTo(dateA);
         });
         break;
 
