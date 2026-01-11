@@ -29,7 +29,11 @@ class ImageGenerationManager extends ChangeNotifier {
 
   /// 从缓存加载数据
   Future<void> loadFromCache() async {
-    if (_cachedData != null) return;
+    // 如果已有数据，先通知监听器（确保新订阅者能收到通知）
+    if (_cachedData != null) {
+      notifyListeners();
+      return;
+    }
     final data = await _storageService.loadB30Data();
     if (data != null) {
       _cachedData = data;
@@ -74,7 +78,8 @@ class ImageGenerationManager extends ChangeNotifier {
       // 保存图片
       final tempDir = await getTemporaryDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fileName = 'arcaea-b30r10-${_cachedData!.player.username}-$timestamp.png';
+      final fileName =
+          'arcaea-b30r10-${_cachedData!.player.username}-$timestamp.png';
       final file = File('${tempDir.path}/$fileName');
       await file.writeAsBytes(imageBytes);
 

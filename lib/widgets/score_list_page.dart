@@ -55,8 +55,6 @@ class _ScoreListPageState extends State<ScoreListPage> {
   void initState() {
     super.initState();
     _attachImageManager(widget.imageManager);
-    // 初始进入时尝试从缓存加载 B30 数据
-    widget.imageManager?.loadFromCache();
     _setupListeners();
     _loadSongMetadata();
     _loadCachedScores();
@@ -94,15 +92,18 @@ class _ScoreListPageState extends State<ScoreListPage> {
       _attachImageManager(widget.imageManager);
     }
 
-    // 每次页面变为活跃状态时，验证 B30 数据
+    // 每次页面变为活跃状态时，主动同步数据
     if (widget.isActive && !oldWidget.isActive) {
-      _validateB30Data();
+      _handleImageManagerChange();
     }
   }
 
   void _validateB30Data() {
-    if (_b30Data == null) {
-      widget.imageManager?.loadFromCache();
+    // 主动同步当前数据
+    _handleImageManagerChange();
+    // 如果manager还没有数据，尝试从缓存加载
+    if (_attachedImageManager?.cachedData == null) {
+      _attachedImageManager?.loadFromCache();
     }
   }
 
@@ -110,7 +111,12 @@ class _ScoreListPageState extends State<ScoreListPage> {
     if (manager == null) return;
     _attachedImageManager = manager;
     manager.addListener(_handleImageManagerChange);
+    // 立即同步当前数据状态
     _handleImageManagerChange();
+    // 如果manager还没有数据，再尝试从缓存加载
+    if (manager.cachedData == null) {
+      Future.microtask(() => manager.loadFromCache());
+    }
   }
 
   void _detachImageManager() {
