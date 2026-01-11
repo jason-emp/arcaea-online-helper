@@ -131,6 +131,24 @@ class ScoreStorageService {
     }
   }
 
+  /// 清除所有数据（包括成绩、B30、排序选项等）
+  Future<void> clearAllData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_scoresKey);
+      await prefs.remove(_lastUpdateKey);
+      await prefs.remove(_totalCountKey);
+      await prefs.remove(_playerPTTKey);
+      await prefs.remove(_sortOptionKey);
+      await prefs.remove(_b30DataKey);
+      
+      print('[ScoreStorage] 所有数据已清除');
+    } catch (e) {
+      print('[ScoreStorage] 清除所有数据失败: $e');
+      rethrow;
+    }
+  }
+
   /// 追加新成绩（用于增量更新）
   Future<void> appendScores(List<ScoreData> newScores) async {
     try {

@@ -15,6 +15,7 @@ class B30R10Page extends StatefulWidget {
   final VoidCallback onDownloadLatest;
   final VoidCallback onCheckUpdate;
   final VoidCallback onUpdateData;
+  final VoidCallback onClearAllData;
   // 设置对话框状态
   final bool isCheckingUpdate;
   final bool isGeneratingImage;
@@ -36,6 +37,7 @@ class B30R10Page extends StatefulWidget {
     required this.onDownloadLatest,
     required this.onCheckUpdate,
     required this.onUpdateData,
+    required this.onClearAllData,
     required this.isCheckingUpdate,
     required this.isGeneratingImage,
     required this.isUpdatingData,
@@ -1121,6 +1123,7 @@ class _B30R10PageState extends State<B30R10Page> {
       onDownloadLatest: widget.onDownloadLatest,
       onCheckUpdate: widget.onCheckUpdate,
       onUpdateData: widget.onUpdateData,
+      onClearAllData: widget.onClearAllData,
       isCheckingUpdate: widget.isCheckingUpdate,
       isGeneratingImage: widget.isGeneratingImage,
       isUpdatingData: widget.isUpdatingData,

@@ -7,6 +7,7 @@ Future<void> showSettingsDialog({
   required VoidCallback onDownloadLatest,
   required VoidCallback onCheckUpdate,
   required VoidCallback onUpdateData,
+  required VoidCallback onClearAllData,
   required bool isCheckingUpdate,
   required bool isGeneratingImage,
   required bool isUpdatingData,
@@ -24,6 +25,7 @@ Future<void> showSettingsDialog({
       onDownloadLatest: onDownloadLatest,
       onCheckUpdate: onCheckUpdate,
       onUpdateData: onUpdateData,
+      onClearAllData: onClearAllData,
       isCheckingUpdate: isCheckingUpdate,
       isGeneratingImage: isGeneratingImage,
       isUpdatingData: isUpdatingData,
@@ -43,6 +45,7 @@ class _SettingsDialog extends StatelessWidget {
   final VoidCallback onDownloadLatest;
   final VoidCallback onCheckUpdate;
   final VoidCallback onUpdateData;
+  final VoidCallback onClearAllData;
   final bool isCheckingUpdate;
   final bool isGeneratingImage;
   final bool isUpdatingData;
@@ -58,6 +61,7 @@ class _SettingsDialog extends StatelessWidget {
     required this.onDownloadLatest,
     required this.onCheckUpdate,
     required this.onUpdateData,
+    required this.onClearAllData,
     this.isCheckingUpdate = false,
     this.isGeneratingImage = false,
     this.isUpdatingData = false,
@@ -178,6 +182,34 @@ class _SettingsDialog extends StatelessWidget {
                       dataUpdateMessage ?? '从 GitHub 下载最新的曲目列表和定数数据',
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    const Text(
+                      '危险操作',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: () => _showClearDataConfirmDialog(context),
+                      icon: const Icon(Icons.delete_forever, color: Colors.red),
+                      label: const Text(
+                        '清除所有数据',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.red),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '将清除所有成绩记录、B30/R10 数据、排序设置和登录信息',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
                   ],
                 ),
               ),
@@ -215,5 +247,41 @@ class _SettingsDialog extends StatelessWidget {
     } else {
       return '上次更新: 刚刚';
     }
+  }
+
+  /// 显示清除数据确认对话框
+  void _showClearDataConfirmDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.warning, color: Colors.red, size: 48),
+        title: const Text('确认清除所有数据'),
+        content: const Text(
+          '此操作将永久删除：\n\n'
+          '• 所有成绩记录\n'
+          '• B30/R10 数据\n'
+          '• 排序设置\n'
+          '• 登录信息（Cookies）\n\n'
+          '清除后需要重新登录，此操作无法撤销，确定要继续吗？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop(); // 关闭确认对话框
+              Navigator.of(context).pop(); // 关闭设置对话框
+              onClearAllData(); // 执行清除操作
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('确认清除'),
+          ),
+        ],
+      ),
+    );
   }
 }

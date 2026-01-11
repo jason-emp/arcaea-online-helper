@@ -11,6 +11,7 @@ import 'models/app_settings.dart';
 import 'models/b30r10_data.dart';
 import 'services/data_update_service.dart';
 import 'services/image_generation_manager.dart';
+import 'services/score_storage_service.dart';
 import 'services/update_service.dart';
 import 'services/webview_script_manager.dart';
 import 'widgets/b30r10_page.dart';
@@ -139,6 +140,14 @@ class _MainTabPageState extends State<MainTabPage> {
     }
   }
 
+  void _clearAllData() async {
+    await _webViewKey.currentState?._clearAllData();
+    // 清除完成后更新主页面状态
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   void _launchLatestRelease() {
     _webViewKey.currentState?._launchLatestRelease();
   }
@@ -184,6 +193,7 @@ class _MainTabPageState extends State<MainTabPage> {
               onDownloadLatest: _launchLatestRelease,
               onCheckUpdate: _checkUpdate,
               onUpdateData: _updateData,
+              onClearAllData: _clearAllData,
               isCheckingUpdate: webViewState?._isCheckingUpdate ?? false,
               isGeneratingImage: _imageManager.isGenerating,
               isUpdatingData: webViewState?._isUpdatingData ?? false,
@@ -207,6 +217,7 @@ class _MainTabPageState extends State<MainTabPage> {
               onDownloadLatest: _launchLatestRelease,
               onCheckUpdate: _checkUpdate,
               onUpdateData: _updateData,
+              onClearAllData: _clearAllData,
               isCheckingUpdate: webViewState?._isCheckingUpdate ?? false,
               isGeneratingImage: _imageManager.isGenerating,
               isUpdatingData: webViewState?._isUpdatingData ?? false,
@@ -507,6 +518,54 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
         setState(() {
           _isUpdatingData = false;
         });
+      }
+    }
+  }
+
+  Future<void> _clearAllData() async {
+    try {
+      // 1. 清除本地存储的数据
+      final storageService = ScoreStorageService();
+      await storageService.clearAllData();
+      
+      // 2. 清除图片管理器中的缓存数据
+      _imageManager.cachedData = null;
+      
+      // 3. 清除 WebView 的 Cookie 和缓存（登录数据）
+      if (webViewController != null) {
+        final cookieManager = CookieManager.instance();
+        await cookieManager.deleteAllCookies();
+        debugPrint('[清除数据] 已清除所有 Cookies');
+        
+        // 清除 WebView 缓存
+        await webViewController!.clearCache();
+        debugPrint('[清除数据] 已清除 WebView 缓存');
+      }
+      
+      // 4. 重置脚本管理器状态
+      _scriptManager.resetInjectionState();
+      
+      if (!mounted) return;
+      
+      _showSnackBar(
+        '所有数据已清除（包括登录信息）',
+        duration: const Duration(seconds: 3),
+      );
+      
+      // 5. 重新加载页面以应用清除
+      if (webViewController != null) {
+        _showSnackBar(
+          '需要重新登录以使用功能',
+          action: SnackBarAction(
+            label: '前往登录',
+            onPressed: () => webViewController?.reload(),
+          ),
+          duration: const Duration(seconds: 5),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnackBar('清除数据失败: $e');
       }
     }
   }
@@ -896,6 +955,7 @@ class _ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
       onDownloadLatest: _launchLatestRelease,
       onCheckUpdate: _checkForUpdate,
       onUpdateData: _updateData,
+      onClearAllData: _clearAllData,
       isCheckingUpdate: _isCheckingUpdate,
       isGeneratingImage: _imageManager.isGenerating,
       isUpdatingData: _isUpdatingData,
