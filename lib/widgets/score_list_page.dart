@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../core/theme/arcaea_colors.dart';
+import '../core/utils/formatters.dart';
+import '../core/utils/ptt_calculator.dart';
 import '../models/b30r10_data.dart';
 import '../models/score_data.dart';
 import '../models/score_filter.dart';
@@ -95,15 +98,6 @@ class _ScoreListPageState extends State<ScoreListPage> {
     // 每次页面变为活跃状态时，主动同步数据
     if (widget.isActive && !oldWidget.isActive) {
       _handleImageManagerChange();
-    }
-  }
-
-  void _validateB30Data() {
-    // 主动同步当前数据
-    _handleImageManagerChange();
-    // 如果manager还没有数据，尝试从缓存加载
-    if (_attachedImageManager?.cachedData == null) {
-      _attachedImageManager?.loadFromCache();
     }
   }
 
@@ -1137,23 +1131,6 @@ class _ScoreListPageState extends State<ScoreListPage> {
     );
   }
 
-  String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inMinutes < 1) {
-      return '刚刚';
-    } else if (difference.inHours < 1) {
-      return '${difference.inMinutes} 分钟前';
-    } else if (difference.inDays < 1) {
-      return '${difference.inHours} 小时前';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} 天前';
-    } else {
-      return DateFormat('yyyy-MM-dd HH:mm').format(dateTime);
-    }
-  }
-
   Widget _buildScoreList() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -1285,14 +1262,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
   }
 
   double? _calculatePlayPTT(int score, double constant) {
-    if (score >= 10000000) {
-      return constant + 2;
-    } else if (score >= 9800000) {
-      return constant + 1 + (score - 9800000) / 200000;
-    } else {
-      final ptt = constant + (score - 9500000) / 300000;
-      return ptt < 0 ? 0 : ptt;
-    }
+    return PTTCalculator.calculatePlayPTT(score, constant);
   }
 
   int? _calculateReplacementTargetScore({
@@ -1301,48 +1271,12 @@ class _ScoreListPageState extends State<ScoreListPage> {
     required double totalPTT,
     required double replacedPTT,
   }) {
-    final displayPTT = (totalPTT * 100).floor() / 100;
-    final targetDisplay = displayPTT + 0.01;
-    final maxPotential = constant + 2;
-    if (maxPotential <= replacedPTT + 1e-9) {
-      return null;
-    }
-
-    int left = currentScore >= 10000000 ? 10000000 : currentScore + 1;
-    if (left > 10000000) return null;
-    int right = 10000000;
-    int? result;
-
-    while (left <= right) {
-      final mid = (left + right) ~/ 2;
-      final newPlayPTT = _calculatePlayPTT(mid, constant);
-      if (newPlayPTT == null) {
-        left = mid + 1;
-        continue;
-      }
-
-      double newTotalPTT;
-      if (newPlayPTT <= replacedPTT + 1e-9) {
-        newTotalPTT = totalPTT;
-      } else {
-        newTotalPTT = totalPTT - replacedPTT / 40 + newPlayPTT / 40;
-      }
-      final newDisplay = (newTotalPTT * 100).floor() / 100;
-
-      if (newDisplay >= targetDisplay) {
-        result = mid;
-        right = mid - 1;
-      } else {
-        left = mid + 1;
-      }
-    }
-
-    if (result == null) return null;
-    final achievedPTT = _calculatePlayPTT(result, constant);
-    if (achievedPTT == null || achievedPTT <= replacedPTT + 1e-9) return null;
-    final finalTotal = totalPTT - replacedPTT / 40 + achievedPTT / 40;
-    final finalDisplay = (finalTotal * 100).floor() / 100;
-    return finalDisplay >= targetDisplay ? result : null;
+    return PTTCalculator.calculateReplacementTargetScore(
+      constant: constant,
+      currentScore: currentScore,
+      totalPTT: totalPTT,
+      replacedPTT: replacedPTT,
+    );
   }
 
   String _buildSongKey(String title, String difficulty) {
@@ -1381,24 +1315,7 @@ class _ScoreCard extends StatelessWidget {
   });
 
   Color _getGradeColor(String grade) {
-    switch (grade) {
-      case 'EX+':
-        return Colors.purple[700]!;
-      case 'EX':
-        return Colors.purple[500]!;
-      case 'AA':
-        return Colors.pink[600]!;
-      case 'A':
-        return Colors.blue[600]!;
-      case 'B':
-        return Colors.green[600]!;
-      case 'C':
-        return Colors.orange[600]!;
-      case 'D':
-        return Colors.grey[600]!;
-      default:
-        return Colors.grey[600]!;
-    }
+    return ArcaeaColors.getGradeColor(grade);
   }
 
   Widget _buildInfoChip(
@@ -1449,23 +1366,11 @@ class _ScoreCard extends StatelessWidget {
   }
 
   String _formatScoreValue(int score) {
-    final scoreStr = score.toString().padLeft(8, '0');
-    return '${scoreStr.substring(0, 2)},${scoreStr.substring(2, 5)},${scoreStr.substring(5)}';
+    return Formatters.formatScoreWithCommas(score);
   }
 
   Color _getDifficultyColor(String difficulty) {
-    switch (difficulty) {
-      case 'PST':
-        return const Color(0xFF4A9C6D); // 绿色
-      case 'PRS':
-        return const Color(0xFFE8B600); // 黄色
-      case 'FTR':
-        return const Color(0xFF8B5A9E); // 紫色
-      case 'BYD':
-        return const Color(0xFFDC143C); // 红色
-      default:
-        return Colors.grey[600]!;
-    }
+    return ArcaeaColors.getDifficultyColor(difficulty);
   }
 
   @override

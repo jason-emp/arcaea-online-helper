@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
+import '../core/theme/arcaea_colors.dart';
+import '../core/utils/difficulty_utils.dart';
+import '../core/utils/formatters.dart';
+import '../core/utils/ptt_calculator.dart';
 import '../models/app_settings.dart';
 import '../models/b30r10_data.dart';
 import '../models/score_data.dart';
 import '../services/image_generation_manager.dart';
 import '../services/score_storage_service.dart';
 import '../services/song_data_service.dart';
-import '../widgets/settings_dialog.dart';
+import 'common/arcaea_widgets.dart';
+import 'b30r10/player_card.dart';
+import 'b30r10/ptt_increase_card.dart';
+import 'b30r10/song_card.dart';
+import 'settings_dialog.dart';
 
 /// B30/R10 Flutter列表页面
 class B30R10Page extends StatefulWidget {
@@ -1200,52 +1208,15 @@ class _B30R10PageState extends State<B30R10Page> {
   }
 
   Color _getDifficultyColor(String difficulty) {
-    switch (difficulty) {
-      case 'PST':
-        return const Color(0xFF4A9C6D);
-      case 'PRS':
-        return const Color(0xFFE8B600);
-      case 'FTR':
-        return const Color(0xFF8B5A9E);
-      case 'BYD':
-        return const Color(0xFFDC143C);
-      default:
-        return Colors.grey[600]!;
-    }
+    return ArcaeaColors.getDifficultyColor(difficulty);
   }
 
   Color _getGradeColor(String grade) {
-    switch (grade) {
-      case 'PM':
-        return Colors.deepPurple[700]!;
-      case 'EX+':
-        return Colors.purple[700]!;
-      case 'EX':
-        return Colors.purple[500]!;
-      case 'AA':
-        return Colors.pink[600]!;
-      case 'A':
-        return Colors.blue[600]!;
-      case 'B':
-        return Colors.green[600]!;
-      case 'C':
-        return Colors.orange[600]!;
-      case 'D':
-        return Colors.grey[600]!;
-      default:
-        return Colors.grey[600]!;
-    }
+    return ArcaeaColors.getGradeColor(grade);
   }
 
   String _getScoreGrade(int score) {
-    if (score >= 10000000) return 'PM';
-    if (score >= 9900000) return 'EX+';
-    if (score >= 9800000) return 'EX';
-    if (score >= 9500000) return 'AA';
-    if (score >= 9200000) return 'A';
-    if (score >= 8900000) return 'B';
-    if (score >= 8600000) return 'C';
-    return 'D';
+    return Formatters.getScoreGrade(score);
   }
 
   /// 显示歌曲详情
@@ -1292,68 +1263,18 @@ class _B30R10PageState extends State<B30R10Page> {
 
   /// 格式化分数
   String _formatScore(int score) {
-    return score.toString().padLeft(8, '0');
-  }
-
-  /// 格式化日期时间
-  String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-'
-        '${dateTime.day.toString().padLeft(2, '0')} '
-        '${dateTime.hour.toString().padLeft(2, '0')}:'
-        '${dateTime.minute.toString().padLeft(2, '0')}';
+    return Formatters.formatScore(score);
   }
 
   /// 计算目标分数（使PTT +0.01）
   int? _calculateTargetScore(SongCardData song) {
     if (song.constant == null || _data?.player.totalPTT == null) return null;
     if (song.score >= 10000000) return null;
-
-    final constant = song.constant!;
-    final totalPTT = _data!.player.totalPTT!;
-    final currentDisplayPTT = (totalPTT * 100).floor() / 100;
-    final targetDisplayPTT = currentDisplayPTT + 0.01;
-
-    // 计算当前PlayPTT
-    double currentPlayPTT;
-    if (song.score >= 10000000) {
-      currentPlayPTT = constant + 2;
-    } else if (song.score >= 9800000) {
-      currentPlayPTT = constant + 1 + (song.score - 9800000) / 200000;
-    } else {
-      currentPlayPTT = constant + (song.score - 9500000) / 300000;
-      if (currentPlayPTT < 0) currentPlayPTT = 0;
-    }
-
-    // 二分查找目标分数
-    int left = song.score + 1;
-    int right = 10000000;
-    int? result;
-
-    while (left <= right) {
-      final mid = (left + right) ~/ 2;
-      double newPlayPTT;
-
-      if (mid >= 10000000) {
-        newPlayPTT = constant + 2;
-      } else if (mid >= 9800000) {
-        newPlayPTT = constant + 1 + (mid - 9800000) / 200000;
-      } else {
-        newPlayPTT = constant + (mid - 9500000) / 300000;
-        if (newPlayPTT < 0) newPlayPTT = 0;
-      }
-
-      final newTotalPTT = totalPTT + (newPlayPTT - currentPlayPTT) / 40;
-      final newDisplayPTT = (newTotalPTT * 100).floor() / 100;
-
-      if (newDisplayPTT >= targetDisplayPTT) {
-        result = mid;
-        right = mid - 1;
-      } else {
-        left = mid + 1;
-      }
-    }
-
-    return result;
+    return PTTCalculator.calculateTargetScore(
+      constant: song.constant!,
+      currentScore: song.score,
+      totalPTT: _data!.player.totalPTT!,
+    );
   }
 
   /// 计算所需最低谱面定数
@@ -1362,89 +1283,20 @@ class _B30R10PageState extends State<B30R10Page> {
     List<double> best30PTTs,
     List<double> recent10PTTs,
   ) {
-    final displayedPTT = (currentPTT * 100).floor() / 100;
-    final targetPTT = displayedPTT + 0.01;
-    final deltaS = 40 * (targetPTT - currentPTT);
-
-    final bMin = best30PTTs.isNotEmpty
-        ? best30PTTs.reduce((a, b) => a < b ? a : b)
-        : 0.0;
-    final rMin = recent10PTTs.isNotEmpty
-        ? recent10PTTs.reduce((a, b) => a < b ? a : b)
-        : 0.0;
-
-    double xNeeded = double.infinity;
-
-    // 场景A: 仅替换 Recent10
-    final xA = rMin + deltaS;
-    if (xA <= bMin) {
-      xNeeded = xNeeded < xA ? xNeeded : xA;
-    }
-
-    // 场景B: 仅替换 Best30
-    final xB = bMin + deltaS;
-    if (xB <= rMin) {
-      xNeeded = xNeeded < xB ? xNeeded : xB;
-    }
-
-    // 场景C: 同时替换 Best30 和 Recent10
-    final xC = (bMin + rMin + deltaS) / 2;
-    if (xC >= bMin && xC >= rMin) {
-      xNeeded = xNeeded < xC ? xNeeded : xC;
-    }
-
-    if (xNeeded == double.infinity) {
-      xNeeded = (bMin > rMin ? bMin : rMin) + deltaS;
-    }
-
-    // 不同分数等级
-    final scoreGrades = [
-      {'label': '995W', 'offset': 1.75},
-      {'label': 'EX+', 'offset': 1.5},
-      {'label': 'EX', 'offset': 1.0},
-      {'label': '970W', 'offset': 0.667},
-      {'label': '960W', 'offset': 0.333},
-      {'label': 'AA', 'offset': 0.0},
-    ];
-
-    return scoreGrades.map((grade) {
-      final rawConstant = xNeeded - (grade['offset'] as double);
-      final constant = (rawConstant * 10).ceil() / 10;
-      return {
-        'label': grade['label'] as String,
-        'constant': constant.toStringAsFixed(1),
-      };
-    }).toList();
+    return PTTCalculator.calculateRequiredConstants(
+      currentPTT: currentPTT,
+      best30PTTs: best30PTTs,
+      recent10PTTs: recent10PTTs,
+    );
   }
 
   double? _calculatePlayPTT(int score, double constant) {
-    if (score >= 10000000) {
-      return constant + 2;
-    } else if (score >= 9800000) {
-      return constant + 1 + (score - 9800000) / 200000;
-    } else if (score >= 9500000) {
-      final value = constant + (score - 9500000) / 300000;
-      return value < 0 ? 0 : value;
-    }
-    final fallback = constant + (score - 9500000) / 300000;
-    return fallback < 0 ? 0 : fallback;
+    return PTTCalculator.calculatePlayPTT(score, constant);
   }
 
   int _parseDifficultyIndex(String difficulty) {
-    switch (difficulty.trim().toUpperCase()) {
-      case 'PST':
-        return 0;
-      case 'PRS':
-        return 1;
-      case 'FTR':
-        return 2;
-      case 'ETR':
-        return 3;
-      case 'BYD':
-        return 4;
-      default:
-        return 0;
-    }
+    final idx = DifficultyUtils.parseDifficultyIndex(difficulty);
+    return idx >= 0 ? idx : 0;
   }
 
   String _buildSongKey(String title, String difficulty) {
