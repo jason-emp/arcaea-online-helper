@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'core/constants.dart';
 import 'models/app_settings.dart';
 import 'services/background_update_service.dart';
 import 'services/image_generation_manager.dart';
@@ -106,6 +108,43 @@ class _MainTabPageState extends State<MainTabPage> {
     _imageManager.loadFromCache();
     _loadAppSettings();
     _initBackgroundUpdateListener();
+    _checkAndShowUpgradeNotice();
+  }
+
+  /// 检查并显示升级提醒（首次启动时）
+  Future<void> _checkAndShowUpgradeNotice() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasShown = prefs.getBool(AppConstants.prefHasShownUpgradeNotice) ?? false;
+    
+    if (!hasShown && mounted) {
+      // 延迟显示，确保界面已渲染完成
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return;
+      
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          icon: const Icon(Icons.tips_and_updates, color: Colors.orange, size: 48),
+          title: const Text('v1.2.0 升级提醒'),
+          content: const Text(
+            '感谢更新至 v1.2.0！\n\n'
+            '⚠️ 重要提示：如果您曾经使用了旧版本，强烈建议在升级后先前往设置页点击「清除所有数据」，'
+            '然后重新登录获取成绩。\n\n'
+            '经测试，旧版本数据可能存在兼容性问题，清除后重新获取可避免异常。',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('我知道了'),
+            ),
+          ],
+        ),
+      );
+      
+      // 标记已显示过
+      await prefs.setBool(AppConstants.prefHasShownUpgradeNotice, true);
+    }
   }
 
   /// 初始化后台更新监听

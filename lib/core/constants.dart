@@ -50,4 +50,5 @@ class AppConstants {
   static const String prefShowDownloadButtons = 'showDownloadButtons';
   static const String prefExtraBestSongsCount = 'extraBestSongsCount';
   static const String prefSelectedPartnerIconUrl = 'selectedPartnerIconUrl';
+  static const String prefHasShownUpgradeNotice = 'hasShownUpgradeNotice_v1_2_0';
 }
