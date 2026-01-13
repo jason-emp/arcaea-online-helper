@@ -8,6 +8,7 @@ class SettingsPage extends StatefulWidget {
   final VoidCallback onCheckUpdate;
   final VoidCallback onUpdateData;
   final VoidCallback onClearAllData;
+  final VoidCallback onNavigateToWebView;
   final bool isCheckingUpdate;
   final bool isGeneratingImage;
   final bool isUpdatingData;
@@ -27,6 +28,7 @@ class SettingsPage extends StatefulWidget {
     required this.onCheckUpdate,
     required this.onUpdateData,
     required this.onClearAllData,
+    required this.onNavigateToWebView,
     this.isCheckingUpdate = false,
     this.isGeneratingImage = false,
     this.isUpdatingData = false,
@@ -185,6 +187,45 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SizedBox(height: 4),
                     Text(
                       widget.updateStatusMessage ?? '点击"检查更新"以获取最新版本信息',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // 登录管理
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.login_outlined),
+                        SizedBox(width: 8),
+                        Text(
+                          '登录管理',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: widget.onNavigateToWebView,
+                        icon: const Icon(Icons.web),
+                        label: const Text('前往 WebView 登录'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '打开 Arcaea 官网 WebView 页面进行登录或查看账号信息',
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],

@@ -404,42 +404,37 @@ class _ScoreListPageState extends State<ScoreListPage> {
   DateTime? _parseDate(String dateStr) {
     if (dateStr.isEmpty) return null;
 
-    // 先判断日期格式的类型，避免 yyyy/M/d 被误解析为儒略日
+    // 先判断日期格式的类型
     final bool usesSlash = dateStr.contains('/');
     final bool usesDash = dateStr.contains('-');
     final bool hasTime = dateStr.contains(':');
 
-    // 根据分隔符和是否有时间来选择格式
-    List<String> formats;
+    // 根据分隔符和是否有时间来选择格式（优先级排序）
+    List<String> formats = [];
 
     if (usesSlash && !usesDash) {
-      // 斜杠格式
-      final parts = dateStr.split(RegExp(r'[/\s:]'));
-      if (parts.isNotEmpty && parts[0].length == 4) {
-        // yyyy/M/d 格式（年份在前）
-        if (hasTime) {
-          formats = [
-            'yyyy/MM/dd HH:mm', // 2024/01/15 13:45
-            'yyyy/MM/dd H:mm', // 2024/01/15 1:45
-            'yyyy/M/d HH:mm', // 2024/1/15 13:45
-            'yyyy/M/d H:mm', // 2024/1/15 1:45
-          ];
-        } else {
-          formats = [
-            'yyyy/MM/dd', // 2024/01/15
-            'yyyy/M/d', // 2024/1/15
-          ];
-        }
+      // 斜杠格式 - 同时尝试两种格式以兼容所有情况
+      if (hasTime) {
+        formats = [
+          'M/d/yyyy HH:mm', // 1/15/2024 13:45
+          'M/d/yyyy H:mm', // 1/15/2024 1:45
+          'M/d/yyyy h:mm a', // 1/15/2024 1:45 PM
+          'M/d/yyyy hh:mm a', // 1/15/2024 01:45 PM
+          'yyyy/MM/dd HH:mm', // 2024/01/15 13:45
+          'yyyy/MM/dd H:mm', // 2024/01/15 1:45
+          'yyyy/MM/dd h:mm a', // 2024/01/15 1:45 PM
+          'yyyy/MM/dd hh:mm a', // 2024/01/15 01:45 PM
+          'yyyy/M/d HH:mm', // 2024/1/15 13:45
+          'yyyy/M/d H:mm', // 2024/1/15 1:45
+          'yyyy/M/d h:mm a', // 2024/1/15 1:45 PM
+          'yyyy/M/d hh:mm a', // 2024/1/15 01:45 PM
+        ];
       } else {
-        // M/d/yyyy 格式（月份在前）
-        if (hasTime) {
-          formats = [
-            'M/d/yyyy HH:mm', // 1/15/2024 13:45
-            'M/d/yyyy H:mm', // 1/15/2024 1:45
-          ];
-        } else {
-          formats = ['M/d/yyyy']; // 1/15/2024
-        }
+        formats = [
+          'M/d/yyyy', // 1/15/2024
+          'yyyy/MM/dd', // 2024/01/15
+          'yyyy/M/d', // 2024/1/15
+        ];
       }
     } else if (usesDash && !usesSlash) {
       // 破折号格式
@@ -447,8 +442,12 @@ class _ScoreListPageState extends State<ScoreListPage> {
         formats = [
           'yyyy-MM-dd HH:mm', // 2024-01-15 13:45
           'yyyy-MM-dd H:mm', // 2024-01-15 1:45
+          'yyyy-MM-dd h:mm a', // 2024-01-15 1:45 PM
+          'yyyy-MM-dd hh:mm a', // 2024-01-15 01:45 PM
           'yyyy-M-d HH:mm', // 2024-1-15 13:45
           'yyyy-M-d H:mm', // 2024-1-15 1:45
+          'yyyy-M-d h:mm a', // 2024-1-15 1:45 PM
+          'yyyy-M-d hh:mm a', // 2024-1-15 01:45 PM
         ];
       } else {
         formats = [
@@ -461,18 +460,28 @@ class _ScoreListPageState extends State<ScoreListPage> {
       formats = [
         'M/d/yyyy HH:mm',
         'M/d/yyyy H:mm',
+        'M/d/yyyy h:mm a',
+        'M/d/yyyy hh:mm a',
         'M/d/yyyy',
         'yyyy-MM-dd HH:mm',
         'yyyy-MM-dd H:mm',
+        'yyyy-MM-dd h:mm a',
+        'yyyy-MM-dd hh:mm a',
         'yyyy-MM-dd',
         'yyyy-M-d HH:mm',
         'yyyy-M-d H:mm',
+        'yyyy-M-d h:mm a',
+        'yyyy-M-d hh:mm a',
         'yyyy-M-d',
         'yyyy/MM/dd HH:mm',
         'yyyy/MM/dd H:mm',
+        'yyyy/MM/dd h:mm a',
+        'yyyy/MM/dd hh:mm a',
         'yyyy/MM/dd',
         'yyyy/M/d HH:mm',
         'yyyy/M/d H:mm',
+        'yyyy/M/d h:mm a',
+        'yyyy/M/d hh:mm a',
         'yyyy/M/d',
       ];
     }

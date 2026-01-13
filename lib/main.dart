@@ -312,6 +312,7 @@ class _MainTabPageState extends State<MainTabPage> {
       onCheckUpdate: _checkUpdate,
       onUpdateData: _updateData,
       onClearAllData: _clearAllData,
+      onNavigateToWebView: _navigateToWebView,
       isCheckingUpdate: webViewState?.isCheckingUpdate ?? false,
       isGeneratingImage: _imageManager.isGenerating,
       isUpdatingData: webViewState?.isUpdatingData ?? false,
@@ -416,7 +417,17 @@ class _MainTabPageState extends State<MainTabPage> {
   }
 
   void _onNavTap(int index) {
-    setState(() => _currentIndex = index);
+    setState(() {
+      _currentIndex = index;
+      // 如果 WebView 标签页可见，且用户点击的不是 WebView 标签页（index != 1），则自动隐藏 WebView
+      if (_showWebView && index != 1) {
+        _showWebView = false;
+        // 调整索引：因为隐藏 WebView 后，索引需要减1（除了 PTT 页面）
+        if (index > 1) {
+          _currentIndex = index - 1;
+        }
+      }
+    });
     if (index == 0) {
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) setState(() {});

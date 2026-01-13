@@ -6,42 +6,37 @@ void main() {
     DateTime? parseDate(String dateStr) {
       if (dateStr.isEmpty) return null;
 
-      // 先判断日期格式的类型，避免 yyyy/M/d 被误解析为儒略日
+      // 先判断日期格式的类型
       final bool usesSlash = dateStr.contains('/');
       final bool usesDash = dateStr.contains('-');
       final bool hasTime = dateStr.contains(':');
 
-      // 根据分隔符和是否有时间来选择格式
-      List<String> formats;
+      // 根据分隔符和是否有时间来选择格式（优先级排序）
+      List<String> formats = [];
 
       if (usesSlash && !usesDash) {
-        // 斜杠格式
-        final parts = dateStr.split(RegExp(r'[/\s:]'));
-        if (parts.isNotEmpty && parts[0].length == 4) {
-          // yyyy/M/d 格式（年份在前）
-          if (hasTime) {
-            formats = [
-              'yyyy/MM/dd HH:mm', // 2024/01/15 13:45
-              'yyyy/MM/dd H:mm', // 2024/01/15 1:45
-              'yyyy/M/d HH:mm', // 2024/1/15 13:45
-              'yyyy/M/d H:mm', // 2024/1/15 1:45
-            ];
-          } else {
-            formats = [
-              'yyyy/MM/dd', // 2024/01/15
-              'yyyy/M/d', // 2024/1/15
-            ];
-          }
+        // 斜杠格式 - 同时尝试两种格式以兼容所有情况
+        if (hasTime) {
+          formats = [
+            'M/d/yyyy HH:mm', // 1/15/2024 13:45
+            'M/d/yyyy H:mm', // 1/15/2024 1:45
+            'M/d/yyyy h:mm a', // 1/15/2024 1:45 PM
+            'M/d/yyyy hh:mm a', // 1/15/2024 01:45 PM
+            'yyyy/MM/dd HH:mm', // 2024/01/15 13:45
+            'yyyy/MM/dd H:mm', // 2024/01/15 1:45
+            'yyyy/MM/dd h:mm a', // 2024/01/15 1:45 PM
+            'yyyy/MM/dd hh:mm a', // 2024/01/15 01:45 PM
+            'yyyy/M/d HH:mm', // 2024/1/15 13:45
+            'yyyy/M/d H:mm', // 2024/1/15 1:45
+            'yyyy/M/d h:mm a', // 2024/1/15 1:45 PM
+            'yyyy/M/d hh:mm a', // 2024/1/15 01:45 PM
+          ];
         } else {
-          // M/d/yyyy 格式（月份在前）
-          if (hasTime) {
-            formats = [
-              'M/d/yyyy HH:mm', // 1/15/2024 13:45
-              'M/d/yyyy H:mm', // 1/15/2024 1:45
-            ];
-          } else {
-            formats = ['M/d/yyyy']; // 1/15/2024
-          }
+          formats = [
+            'M/d/yyyy', // 1/15/2024
+            'yyyy/MM/dd', // 2024/01/15
+            'yyyy/M/d', // 2024/1/15
+          ];
         }
       } else if (usesDash && !usesSlash) {
         // 破折号格式
@@ -49,8 +44,12 @@ void main() {
           formats = [
             'yyyy-MM-dd HH:mm', // 2024-01-15 13:45
             'yyyy-MM-dd H:mm', // 2024-01-15 1:45
+            'yyyy-MM-dd h:mm a', // 2024-01-15 1:45 PM
+            'yyyy-MM-dd hh:mm a', // 2024-01-15 01:45 PM
             'yyyy-M-d HH:mm', // 2024-1-15 13:45
             'yyyy-M-d H:mm', // 2024-1-15 1:45
+            'yyyy-M-d h:mm a', // 2024-1-15 1:45 PM
+            'yyyy-M-d hh:mm a', // 2024-1-15 01:45 PM
           ];
         } else {
           formats = [
@@ -63,18 +62,28 @@ void main() {
         formats = [
           'M/d/yyyy HH:mm',
           'M/d/yyyy H:mm',
+          'M/d/yyyy h:mm a',
+          'M/d/yyyy hh:mm a',
           'M/d/yyyy',
           'yyyy-MM-dd HH:mm',
           'yyyy-MM-dd H:mm',
+          'yyyy-MM-dd h:mm a',
+          'yyyy-MM-dd hh:mm a',
           'yyyy-MM-dd',
           'yyyy-M-d HH:mm',
           'yyyy-M-d H:mm',
+          'yyyy-M-d h:mm a',
+          'yyyy-M-d hh:mm a',
           'yyyy-M-d',
           'yyyy/MM/dd HH:mm',
           'yyyy/MM/dd H:mm',
+          'yyyy/MM/dd h:mm a',
+          'yyyy/MM/dd hh:mm a',
           'yyyy/MM/dd',
           'yyyy/M/d HH:mm',
           'yyyy/M/d H:mm',
+          'yyyy/M/d h:mm a',
+          'yyyy/M/d hh:mm a',
           'yyyy/M/d',
         ];
       }
@@ -155,6 +164,36 @@ void main() {
     test('无效格式应返回 null', () {
       final result = parseDate('invalid date');
       expect(result, isNull);
+    });
+
+    test('应该能解析 12 小时制 AM 格式', () {
+      final result = parseDate('1/15/2024 1:45 AM');
+      expect(result, isNotNull);
+      expect(result!.year, 2024);
+      expect(result.month, 1);
+      expect(result.day, 15);
+      expect(result.hour, 1);
+      expect(result.minute, 45);
+    });
+
+    test('应该能解析 12 小时制 PM 格式', () {
+      final result = parseDate('1/15/2024 1:45 PM');
+      expect(result, isNotNull);
+      expect(result!.year, 2024);
+      expect(result.month, 1);
+      expect(result.day, 15);
+      expect(result.hour, 13); // PM 时 1:45 应该是 13:45
+      expect(result.minute, 45);
+    });
+
+    test('应该能解析 yyyy/M/d 格式带 AM/PM', () {
+      final result = parseDate('2024/1/15 11:30 PM');
+      expect(result, isNotNull);
+      expect(result!.year, 2024);
+      expect(result.month, 1);
+      expect(result.day, 15);
+      expect(result.hour, 23); // PM 时 11:30 应该是 23:30
+      expect(result.minute, 30);
     });
 
     test('日期排序应该正确', () {

@@ -405,6 +405,11 @@ class _PTTPageState extends State<PTTPage> {
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
+              const SizedBox(height: 24),
+              Text(
+                '如果您还未登录，请前往设置页进行登录',
+                style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+              ),
             ],
           ),
         ),
