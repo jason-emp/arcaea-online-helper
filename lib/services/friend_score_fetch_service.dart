@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../models/friend_score_data.dart';
 import 'friend_score_storage_service.dart';
@@ -75,13 +76,23 @@ class FriendScoreFetchService {
     final completer = Completer<InAppWebViewController>();
     final url = 'https://arcaea.lowiro.com/zh/profile/scores?page=$startPage';
 
+    // iOS 特定设置，防止 WebView 被过早释放
+    final settings = InAppWebViewSettings(
+      javaScriptEnabled: true,
+      userAgent:
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      // 启用 Cookie 共享，确保 HeadlessWebView 可以访问登录状态
+      sharedCookiesEnabled: true,
+      // iOS 特定设置
+      allowsBackForwardNavigationGestures: false,
+      isFraudulentWebsiteWarningEnabled: false,
+      disableLongPressContextMenuOnLinks: true,
+      allowsLinkPreview: false,
+    );
+
     final webView = HeadlessInAppWebView(
       initialUrlRequest: URLRequest(url: WebUri(url)),
-      initialSettings: InAppWebViewSettings(
-        javaScriptEnabled: true,
-        userAgent:
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      ),
+      initialSettings: settings,
       onLoadStop: (controller, url) async {
         if (!completer.isCompleted) {
           completer.complete(controller);
@@ -96,6 +107,11 @@ class FriendScoreFetchService {
 
     _webViews.add(webView);
     await webView.run();
+    
+    // iOS 平台需要额外等待确保 WebView 稳定
+    if (Platform.isIOS) {
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
     
     await completer.future.timeout(
       const Duration(seconds: 30),
@@ -183,22 +199,56 @@ class FriendScoreFetchService {
       );
 
       // 并行初始化所有 WebView
-      final taskFutures = <Future<_PageRangeFetchTask>>[];
-      for (final config in taskConfigs) {
-        taskFutures.add(_initializeWebViewForPageRange(
-          config['difficulty'],
-          config['difficultyIndex'],
-          config['startPage'],
-          config['endPage'],
-          config['taskId'],
-        ));
-      }
-      
-      final tasks = await Future.wait(taskFutures);
+      // iOS 平台使用串行方式处理任务，避免多个 WebView 导致内存问题
+      // Android 平台使用并行方式提高效率
+      if (Platform.isIOS) {
+        // iOS: 串行处理每个任务，一个完成后再开始下一个
+        for (final config in taskConfigs) {
+          if (!_isFetching) break;
+          
+          try {
+            // 初始化单个 WebView
+            final task = await _initializeWebViewForPageRange(
+              config['difficulty'],
+              config['difficultyIndex'],
+              config['startPage'],
+              config['endPage'],
+              config['taskId'],
+            );
+            
+            // 拉取该任务的数据
+            await _fetchPageRangeFriendScores(task);
+            
+            // 完成后立即清理该 WebView
+            await task.webView.dispose();
+            _webViews.remove(task.webView);
+            
+            // 每个任务之间增加小延迟
+            await Future.delayed(const Duration(milliseconds: 200));
+          } catch (e) {
+            print('[好友成绩获取] iOS 任务 ${config['taskId']} 出错: $e');
+            // 继续处理下一个任务
+          }
+        }
+      } else {
+        // Android: 并行初始化所有 WebView
+        final taskFutures = <Future<_PageRangeFetchTask>>[];
+        for (final config in taskConfigs) {
+          taskFutures.add(_initializeWebViewForPageRange(
+            config['difficulty'],
+            config['difficultyIndex'],
+            config['startPage'],
+            config['endPage'],
+            config['taskId'],
+          ));
+        }
+        
+        final tasks = await Future.wait(taskFutures);
 
-      // 并行拉取所有任务
-      final fetchFutures = tasks.map((task) => _fetchPageRangeFriendScores(task));
-      await Future.wait(fetchFutures);
+        // Android: 并行拉取所有任务
+        final fetchFutures = tasks.map((task) => _fetchPageRangeFriendScores(task));
+        await Future.wait(fetchFutures);
+      }
 
       // _allSongs 已经在 _updateStreamWithAllData 中实时更新了
 
@@ -684,7 +734,7 @@ class FriendScoreFetchService {
         ''',
       );
 
-      final cardCount = cardCountResult as int? ?? 0;
+      final cardCount = cardCountResult is int ? cardCountResult : (cardCountResult is double ? cardCountResult.toInt() : 0);
       if (cardCount == 0) return songs;
 
       // 遍历每个歌曲卡片

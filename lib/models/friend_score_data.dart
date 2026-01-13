@@ -23,13 +23,22 @@ class FriendScoreData {
     required this.difficulty,
   });
 
+  /// 安全地将动态值转换为int（兼容iOS上JavaScript返回double的情况）
+  static int _toInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
   factory FriendScoreData.fromJson(Map<String, dynamic> json) {
     return FriendScoreData(
       username: json['username'] as String,
-      score: json['score'] as int,
+      score: _toInt(json['score']),
       grade: json['grade'] as String,
       characterIconUrl: json['characterIconUrl'] as String,
-      rank: json['rank'] as int,
+      rank: _toInt(json['rank']),
       songTitle: json['songTitle'] as String? ?? '',
       artist: json['artist'] as String? ?? '',
       albumArtUrl: json['albumArtUrl'] as String? ?? '',

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../models/partner_data.dart';
 import 'partner_storage_service.dart';
@@ -27,13 +28,23 @@ class PartnerFetchService {
     // 初始页面
     const url = 'https://arcaea.lowiro.com/zh/profile/partners?page=1';
 
+    // iOS 特定设置，防止 WebView 被过早释放
+    final settings = InAppWebViewSettings(
+      javaScriptEnabled: true,
+      userAgent:
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      // 启用 Cookie 共享，确保 HeadlessWebView 可以访问登录状态
+      sharedCookiesEnabled: true,
+      // iOS 特定设置
+      allowsBackForwardNavigationGestures: false,
+      isFraudulentWebsiteWarningEnabled: false,
+      disableLongPressContextMenuOnLinks: true,
+      allowsLinkPreview: false,
+    );
+
     _headlessWebView = HeadlessInAppWebView(
       initialUrlRequest: URLRequest(url: WebUri(url)),
-      initialSettings: InAppWebViewSettings(
-        javaScriptEnabled: true,
-        userAgent:
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      ),
+      initialSettings: settings,
       onLoadStart: (controller, url) {
         print('[搭档获取] 页面开始加载: $url');
       },
@@ -52,6 +63,12 @@ class PartnerFetchService {
     );
 
     await _headlessWebView!.run();
+    
+    // iOS 平台需要额外等待确保 WebView 稳定
+    if (Platform.isIOS) {
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+    
     return completer.future.timeout(
       const Duration(seconds: 30),
       onTimeout: () {
@@ -198,21 +215,43 @@ class PartnerFetchService {
   Future<void> _waitForPageLoad(InAppWebViewController controller) async {
     // 等待页面加载并检查关键元素是否出现
     print('[搭档获取] 开始等待页面内容加载...');
-    for (int i = 0; i < 25; i++) {
+    
+    // iOS 平台增加初始等待时间
+    if (Platform.isIOS) {
       await Future.delayed(const Duration(milliseconds: 300));
-      final result = await controller.evaluateJavascript(source: '''
-        (function() {
-          const list = document.querySelector('.list');
-          const cards = list ? list.querySelectorAll('.card') : [];
-          console.log('[页面检查] .list: ' + (list !== null) + ', cards: ' + cards.length);
-          return list !== null && cards.length > 0;
-        })();
-      ''');
-      if (result == true) {
-        print('[搭档获取] 页面加载完成，找到 .list 元素和卡片');
-        // 再等待一下确保内容渲染完成
-        await Future.delayed(const Duration(milliseconds: 800));
-        return;
+    }
+    
+    for (int i = 0; i < 25; i++) {
+      // iOS 平台使用更长的等待间隔
+      final waitDuration = Platform.isIOS 
+          ? const Duration(milliseconds: 400) 
+          : const Duration(milliseconds: 300);
+      await Future.delayed(waitDuration);
+      
+      try {
+        final result = await controller.evaluateJavascript(source: '''
+          (function() {
+            const list = document.querySelector('.list');
+            const cards = list ? list.querySelectorAll('.card') : [];
+            console.log('[页面检查] .list: ' + (list !== null) + ', cards: ' + cards.length);
+            return list !== null && cards.length > 0;
+          })();
+        ''');
+        if (result == true) {
+          print('[搭档获取] 页面加载完成，找到 .list 元素和卡片');
+          // iOS 平台增加更长的渲染等待时间
+          final renderDelay = Platform.isIOS 
+              ? const Duration(milliseconds: 1200) 
+              : const Duration(milliseconds: 800);
+          await Future.delayed(renderDelay);
+          return;
+        }
+      } catch (e) {
+        print('[搭档获取] 页面检查异常: $e');
+        if (Platform.isIOS) {
+          // iOS 上如果出现异常，可能是 WebView 被释放了
+          break;
+        }
       }
     }
     print('[搭档获取] 警告: 页面加载超时，未找到完整内容');
@@ -220,20 +259,39 @@ class PartnerFetchService {
   }
 
   Future<int> _getPartnerCount(InAppWebViewController controller) async {
-    final result = await controller.evaluateJavascript(source: '''
-      (function() {
-        // 尝试多个可能的选择器
-        let cards = document.querySelectorAll('.list > .card');
-        if (cards.length === 0) {
-          cards = document.querySelectorAll('.list .card');
-        }
-        console.log('[搭档计数] 找到 ' + cards.length + ' 个卡片');
-        return cards.length;
-      })();
-    ''');
-    final count = result != null ? int.parse(result.toString()) : 0;
-    print('[搭档获取] _getPartnerCount 返回: $count');
-    return count;
+    try {
+      final result = await controller.evaluateJavascript(source: '''
+        (function() {
+          // 尝试多个可能的选择器
+          let cards = document.querySelectorAll('.list > .card');
+          if (cards.length === 0) {
+            cards = document.querySelectorAll('.list .card');
+          }
+          console.log('[搭档计数] 找到 ' + cards.length + ' 个卡片');
+          return cards.length;
+        })();
+      ''');
+      
+      if (result == null) return 0;
+      
+      // 处理可能的不同返回类型
+      if (result is int) return result;
+      if (result is double) return result.toInt();
+      
+      // 字符串解析，处理可能的浮点数格式如 "6.0"
+      final str = result.toString().trim();
+      if (str.isEmpty) return 0;
+      
+      // 尝试解析为 double 然后转 int（处理 "6.0" 这种情况）
+      final parsed = double.tryParse(str);
+      final count = parsed?.toInt() ?? 0;
+      
+      print('[搭档获取] _getPartnerCount 返回: $count');
+      return count;
+    } catch (e) {
+      print('[搭档获取] _getPartnerCount 出错: $e');
+      return 0;
+    }
   }
 
   Future<List<PartnerData>> _fetchPagePartners(
@@ -242,6 +300,23 @@ class PartnerFetchService {
 
     for (int i = 0; i < count; i++) {
       if (!_isFetching) break;
+      
+      // iOS 平台需要检查 WebView 是否仍然有效
+      if (Platform.isIOS) {
+        try {
+          // 通过简单的 JS 调用来检查 WebView 是否仍然存活
+          final isAlive = await controller.evaluateJavascript(source: 'true');
+          if (isAlive != true) {
+            print('[搭档获取] 警告: WebView 可能已失效，跳过剩余搭档');
+            break;
+          }
+        } catch (e) {
+          print('[搭档获取] 警告: WebView 检查失败: $e');
+          break;
+        }
+        // iOS 上每次操作前增加小延迟，避免过快操作导致 WebView 被释放
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
 
       // 1. 点击卡片并获取列表上的信息（如是否选中和头像URL）
       print('[搭档获取] 准备点击第 $i 个搭档卡片...');

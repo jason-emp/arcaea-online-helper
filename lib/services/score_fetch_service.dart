@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../models/score_data.dart';
 import 'score_storage_service.dart';
@@ -34,13 +35,23 @@ class ScoreFetchService {
     final completer = Completer<InAppWebViewController>();
     const url = 'https://arcaea.lowiro.com/zh/profile/scores?page=1';
 
+    // iOS 特定设置，防止 WebView 被过早释放
+    final settings = InAppWebViewSettings(
+      javaScriptEnabled: true,
+      userAgent:
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      // 启用 Cookie 共享，确保 HeadlessWebView 可以访问登录状态
+      sharedCookiesEnabled: true,
+      // iOS 特定设置
+      allowsBackForwardNavigationGestures: false,
+      isFraudulentWebsiteWarningEnabled: false,
+      disableLongPressContextMenuOnLinks: true,
+      allowsLinkPreview: false,
+    );
+
     _headlessWebView = HeadlessInAppWebView(
       initialUrlRequest: URLRequest(url: WebUri(url)),
-      initialSettings: InAppWebViewSettings(
-        javaScriptEnabled: true,
-        userAgent:
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      ),
+      initialSettings: settings,
       onLoadStop: (controller, url) async {
         if (!completer.isCompleted) {
           completer.complete(controller);
@@ -54,6 +65,12 @@ class ScoreFetchService {
     );
 
     await _headlessWebView!.run();
+    
+    // iOS 平台需要额外等待确保 WebView 稳定
+    if (Platform.isIOS) {
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+    
     return completer.future.timeout(
       const Duration(seconds: 30),
       onTimeout: () {

@@ -21,11 +21,20 @@ class ScoreData {
     this.difficulty = 'FTR', // 默认FTR
   });
 
+  /// 安全地将动态值转换为int（兼容iOS上JavaScript返回double的情况）
+  static int _toInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
   factory ScoreData.fromJson(Map<String, dynamic> json) {
     return ScoreData(
       songTitle: json['songTitle'] as String,
       artist: json['artist'] as String,
-      score: json['score'] as int,
+      score: _toInt(json['score']),
       grade: json['grade'] as String,
       clearType: json['clearType'] as String,
       obtainedDate: json['obtainedDate'] as String,
@@ -74,7 +83,7 @@ class ScoreListResponse {
       scores: (json['scores'] as List<dynamic>)
           .map((e) => ScoreData.fromJson(e as Map<String, dynamic>))
           .toList(),
-      currentPage: json['currentPage'] as int,
+      currentPage: ScoreData._toInt(json['currentPage']),
       hasNextPage: json['hasNextPage'] as bool,
       playerPTT: json['playerPTT'] != null
           ? (json['playerPTT'] as num).toDouble()

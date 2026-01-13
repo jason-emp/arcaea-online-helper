@@ -666,6 +666,7 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
         javaScriptCanOpenWindowsAutomatically: true,
         supportZoom: true,
         useOnLoadResource: true,
+        sharedCookiesEnabled: true, // iOS: 与系统/WKWebView共享Cookie
       ),
       onWebViewCreated: _onWebViewCreated,
       onLoadStart: _onLoadStart,

@@ -91,16 +91,25 @@ class SongCardData {
     required this.rank,
   });
 
+  /// 安全地将动态值转换为int（兼容iOS上JavaScript返回double的情况）
+  static int _toInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
   factory SongCardData.fromJson(Map<String, dynamic> json) {
     return SongCardData(
       songTitle: json['songTitle'] as String,
       difficulty: json['difficulty'] as String,
-      difficultyIndex: json['difficultyIndex'] as int,
-      score: json['score'] as int,
+      difficultyIndex: _toInt(json['difficultyIndex']),
+      score: _toInt(json['score']),
       constant: json['constant'] != null ? (json['constant'] as num).toDouble() : null,
       playPTT: json['playPTT'] != null ? (json['playPTT'] as num).toDouble() : null,
       coverUrl: json['coverUrl'] as String?,
-      rank: json['rank'] as int,
+      rank: _toInt(json['rank']),
     );
   }
 

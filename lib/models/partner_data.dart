@@ -23,15 +23,24 @@ class PartnerData {
     this.isSelected = false,
   });
 
+  /// 安全地将动态值转换为int（兼容iOS上JavaScript返回double的情况）
+  static int _toInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
   factory PartnerData.fromJson(Map<String, dynamic> json) {
     return PartnerData(
       name: json['name'] as String,
-      level: json['level'] as int,
+      level: _toInt(json['level']),
       iconUrl: json['iconUrl'] as String,
       type: json['type'] as String,
-      step: json['step'] as int,
-      frag: json['frag'] as int,
-      overdrive: json['overdrive'] as int,
+      step: _toInt(json['step']),
+      frag: _toInt(json['frag']),
+      overdrive: _toInt(json['overdrive']),
       skill: json['skill'] as String?,
       isAwakened: json['isAwakened'] as bool? ?? false,
       isSelected: json['isSelected'] as bool? ?? false,
