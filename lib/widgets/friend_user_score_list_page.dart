@@ -807,7 +807,7 @@ class _FriendUserScoreListPageState extends State<FriendUserScoreListPage> {
     return ListView.builder(
       controller: _scrollController,
       itemCount: _filteredScores.length,
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 80), // 增加底部边距，避免被悬浮按钮遮挡
       itemBuilder: (context, index) {
         return _buildScoreCard(_filteredScores[index]);
       },

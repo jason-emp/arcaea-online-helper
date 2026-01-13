@@ -1187,7 +1187,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
     return ListView.builder(
       controller: _scrollController,
       itemCount: _filteredScores.length,
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 140), // 增加底部边距，避免被悬浮按钮组遮挡
       itemBuilder: (context, index) {
         final score = _filteredScores[index];
         final cardKey = _buildSongKey(score.songTitle, score.difficulty);

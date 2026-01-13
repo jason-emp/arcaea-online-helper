@@ -484,7 +484,7 @@ class _FriendPageState extends State<FriendPage> {
       controller: _scrollController,
       child: ListView.builder(
         controller: _scrollController,
-        padding: const EdgeInsets.all(8.0),
+        padding: const EdgeInsets.fromLTRB(8.0, 8.0, 8.0, 80.0), // 增加底部边距，避免被大的悬浮按钮遮挡
         itemCount: _friends.length,
         itemBuilder: (context, index) {
           return _buildFriendCard(_friends[index]);

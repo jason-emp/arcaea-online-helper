@@ -622,7 +622,7 @@ class _FriendScoreListPageState extends State<FriendScoreListPage> {
 
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 80), // 增加底部边距，避免被悬浮按钮遮挡
       itemCount: _filteredSongs.length,
       itemBuilder: (context, index) {
         return _buildSongCard(_filteredSongs[index]);
