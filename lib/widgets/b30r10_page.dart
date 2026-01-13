@@ -7,8 +7,8 @@ import '../services/image_generation_manager.dart';
 import '../services/score_storage_service.dart';
 import '../services/song_data_service.dart';
 
-/// PTT 数据展示页面
-class PTTPage extends StatefulWidget {
+/// B30/R10 Flutter列表页面
+class B30R10Page extends StatefulWidget {
   final ImageGenerationManager imageManager;
   final bool isLoggedIn;
   final VoidCallback onNavigateToWebView;
@@ -32,7 +32,7 @@ class PTTPage extends StatefulWidget {
   final AppSettings settings;
   final ValueChanged<AppSettings> onSettingsChanged;
 
-  const PTTPage({
+  const B30R10Page({
     super.key,
     required this.imageManager,
     required this.isLoggedIn,
@@ -57,10 +57,10 @@ class PTTPage extends StatefulWidget {
   });
 
   @override
-  State<PTTPage> createState() => _PTTPageState();
+  State<B30R10Page> createState() => _B30R10PageState();
 }
 
-class _PTTPageState extends State<PTTPage> {
+class _B30R10PageState extends State<B30R10Page> {
   B30R10Data? get _data => widget.imageManager.cachedData;
   bool _hasAutoLoaded = false;
   bool _isLoading = false;
@@ -96,7 +96,7 @@ class _PTTPageState extends State<PTTPage> {
   }
 
   @override
-  void didUpdateWidget(PTTPage oldWidget) {
+  void didUpdateWidget(B30R10Page oldWidget) {
     super.didUpdateWidget(oldWidget);
     // 当登录状态变化为已登录，且没有数据时，自动加载
     if (!oldWidget.isLoggedIn &&
@@ -388,7 +388,7 @@ class _PTTPageState extends State<PTTPage> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('PTT'),
+          title: const Text('B30/R10'),
           backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         ),
         body: Center(
@@ -415,7 +415,7 @@ class _PTTPageState extends State<PTTPage> {
     if (_data == null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('PTT'),
+          title: const Text('B30/R10'),
           backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         ),
         body: Center(
@@ -453,14 +453,14 @@ class _PTTPageState extends State<PTTPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('PTT'),
+        title: const Text('B30/R10'),
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         actions: [
           // 只要有数据就显示生图按钮
           IconButton(
             icon: const Icon(Icons.image),
             onPressed: widget.isGeneratingImage ? null : widget.onGenerateImage,
-            tooltip: '生成PTT图片',
+            tooltip: '生成B30/R10图片',
           ),
           IconButton(
             icon: const Icon(Icons.refresh),

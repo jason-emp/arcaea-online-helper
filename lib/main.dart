@@ -9,6 +9,7 @@ import 'services/image_generation_manager.dart';
 import 'widgets/arcaea_webview_page.dart';
 import 'widgets/ptt_page.dart';
 import 'widgets/score_list_page.dart';
+import 'widgets/settings_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -179,7 +180,7 @@ class _MainTabPageState extends State<MainTabPage> {
     
     final int displayIndex = _showWebView 
         ? _currentIndex 
-        : (_currentIndex >= 2 ? 2 : _currentIndex);
+        : (_currentIndex >= 3 ? 3 : _currentIndex);
     
     final scoreListPage = ScoreListPage(
       imageManager: _imageManager,
@@ -217,9 +218,28 @@ class _MainTabPageState extends State<MainTabPage> {
       onSettingsChanged: _handleSettingsChanged,
     );
 
+    final settingsPage = SettingsPage(
+      onGenerateImage: _generateImage,
+      onDownloadLatest: _launchLatestRelease,
+      onCheckUpdate: _checkUpdate,
+      onUpdateData: _updateData,
+      onClearAllData: _clearAllData,
+      isCheckingUpdate: webViewState?.isCheckingUpdate ?? false,
+      isGeneratingImage: _imageManager.isGenerating,
+      isUpdatingData: webViewState?.isUpdatingData ?? false,
+      canGenerateImage: isLoggedIn,
+      currentVersion: webViewState?.currentVersion,
+      latestVersion: webViewState?.latestAvailableVersion,
+      updateStatusMessage: webViewState?.updateStatusMessage,
+      dataUpdateMessage: webViewState?.dataUpdateMessage,
+      lastDataUpdateTime: webViewState?.lastDataUpdateTime,
+      settings: _appSettings,
+      onSettingsChanged: _handleSettingsChanged,
+    );
+
     final List<Widget> pages = _showWebView
-        ? [pttPage, webViewPage, scoreListPage]
-        : [pttPage, scoreListPage, webViewPage];
+        ? [pttPage, webViewPage, scoreListPage, settingsPage]
+        : [pttPage, scoreListPage, settingsPage, webViewPage];
     
     return Scaffold(
       body: IndexedStack(
@@ -233,21 +253,25 @@ class _MainTabPageState extends State<MainTabPage> {
   Widget _buildBottomNavBar() {
     if (_showWebView) {
       return BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
         currentIndex: _currentIndex,
         onTap: _onNavTap,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'PTT'),
           BottomNavigationBarItem(icon: Icon(Icons.web), label: 'WebView'),
           BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: '成绩列表'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: '设置'),
         ],
       );
     } else {
       return BottomNavigationBar(
-        currentIndex: _currentIndex.clamp(0, 1),
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _currentIndex.clamp(0, 2),
         onTap: _onNavTap,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'PTT'),
           BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: '成绩列表'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: '设置'),
         ],
       );
     }

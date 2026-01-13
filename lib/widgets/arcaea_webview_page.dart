@@ -14,7 +14,6 @@ import '../services/image_generation_manager.dart';
 import '../services/score_storage_service.dart';
 import '../services/update_service.dart';
 import '../services/webview_script_manager.dart';
-import 'settings_dialog.dart';
 
 /// Arcaea WebView 页面
 /// 用于登录和访问 Arcaea 官网
@@ -604,10 +603,6 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
             tooltip: '生成B30/R10图片',
             onPressed: _imageManager.isGenerating ? null : generateImage,
           ),
-        IconButton(
-          icon: const Icon(Icons.settings),
-          onPressed: _showSettingsDialog,
-        ),
         if (currentUrl.isNotEmpty)
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -650,28 +645,6 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
           ),
         ],
       ),
-    );
-  }
-
-  void _showSettingsDialog() {
-    showSettingsDialog(
-      context: context,
-      onGenerateImage: generateImage,
-      onDownloadLatest: launchLatestRelease,
-      onCheckUpdate: checkForUpdate,
-      onUpdateData: updateData,
-      onClearAllData: clearAllData,
-      isCheckingUpdate: _isCheckingUpdate,
-      isGeneratingImage: _imageManager.isGenerating,
-      isUpdatingData: _isUpdatingData,
-      canGenerateImage: _scriptManager.state.isTargetPage,
-      currentVersion: _currentVersion,
-      latestVersion: _latestAvailableVersion,
-      updateStatusMessage: _updateStatusMessage,
-      dataUpdateMessage: _dataUpdateMessage,
-      lastDataUpdateTime: _lastDataUpdateTime,
-      settings: widget.settings,
-      onSettingsChanged: widget.onSettingsChanged,
     );
   }
 
