@@ -50,6 +50,7 @@ class SongDataService {
       final songId = rawSong['id'] as String?;
       if (songId == null || songId.isEmpty) continue;
 
+      // 添加 title_localized 中的所有标题
       final localized = rawSong['title_localized'];
       if (localized is Map) {
         for (final value in localized.values) {
@@ -59,6 +60,7 @@ class SongDataService {
         }
       }
 
+      // 添加 search_title 中的所有搜索标题
       final searchTitle = rawSong['search_title'];
       if (searchTitle is Map) {
         for (final entry in searchTitle.values) {
@@ -74,7 +76,18 @@ class SongDataService {
         }
       }
 
+      // 添加歌曲 ID 本身
       _addTitleMapping(songId, songId);
+      
+      // 尝试添加 remote_title（如果存在）
+      final remoteTitle = rawSong['remote_title'];
+      if (remoteTitle is Map) {
+        for (final value in remoteTitle.values) {
+          if (value is String) {
+            _addTitleMapping(value, songId);
+          }
+        }
+      }
     }
   }
 
@@ -104,32 +117,49 @@ class SongDataService {
     if (!_isLoaded) return null;
     final normalizedInput = title.trim().toLowerCase();
 
+    // 精确匹配
     if (_titleToSongId.containsKey(normalizedInput)) {
       return _titleToSongId[normalizedInput];
     }
 
+    // 规范化匹配（去除特殊字符后匹配）
     final simplified = _normalizeTitle(normalizedInput);
-    if (simplified.isEmpty) return null;
-    return _normalizedTitleToId[simplified];
+    if (simplified.isNotEmpty && _normalizedTitleToId.containsKey(simplified)) {
+      return _normalizedTitleToId[simplified];
+    }
+
+    // 移除模糊匹配，因为它会导致错误匹配
+    // 例如 "Last | Moment" 被错误匹配到 "last"
+    
+    return null;
   }
 
   /// 通过歌曲名与难度获取定数
   double? getConstant(String songTitle, String difficulty) {
     if (!_isLoaded) return null;
     final songId = _findSongId(songTitle);
-    if (songId == null) return null;
+    if (songId == null) {
+      // 找不到歌曲，可能是标题匹配问题
+      return null;
+    }
 
     final constants = _chartConstants?[songId];
-    if (constants is! List) return null;
+    if (constants is! List) {
+      return null;
+    }
 
     final diffIndex = _parseDifficultyIndex(difficulty);
-    if (diffIndex < 0 || diffIndex >= constants.length) return null;
+    if (diffIndex < 0 || diffIndex >= constants.length) {
+      return null;
+    }
 
     final entry = constants[diffIndex];
     if (entry is Map<String, dynamic> && entry['constant'] != null) {
       return (entry['constant'] as num).toDouble();
     }
 
+    // 该难度没有定数（entry 为 null），这是正常情况
+    // 不是所有歌曲都有 ETR/BYD 难度
     return null;
   }
 
@@ -149,6 +179,12 @@ class SongDataService {
     return entry != null;
   }
 
+  /// 检查是否能找到歌曲（用于判断是否是标题匹配问题）
+  bool canFindSong(String songTitle) {
+    if (!_isLoaded) return false;
+    return _findSongId(songTitle) != null;
+  }
+
   int _parseDifficultyIndex(String difficulty) {
     final normalized = difficulty.trim().toLowerCase();
     switch (normalized) {
@@ -163,10 +199,10 @@ class SongDataService {
         return 2;
       case 'beyond':
       case 'byd':
-        return 4;
+        return 3;  // 修复：BYD 是索引 3
       case 'eternal':
       case 'etr':
-        return 3;
+        return 4;  // 修复：ETR 是索引 4
       default:
         return -1;
     }

@@ -368,15 +368,12 @@ class ScoreFetchService {
                 .map((e) => ScoreData.fromJson(e as Map<String, dynamic>))
                 .toList();
 
-            // 针对 ETR 和 BYD 难度进行额外校验
-            if (difficulty == 'BYD' || difficulty == 'ETR') {
-              scores = scores.where((score) {
-                return _songDataService.hasDifficulty(
-                  score.songTitle,
-                  difficulty,
-                );
-              }).toList();
-            }
+            // 移除了 ETR 和 BYD 的过滤逻辑
+            // 原因：官网返回的数据应该是准确的，不应该因为本地数据匹配问题而过滤掉正确的成绩
+            // if (difficulty == 'BYD' || difficulty == 'ETR') {
+            //   ...过滤逻辑...
+            // }
+
 
             if (scores.isEmpty) {
               consecutiveEmptyPages++;
