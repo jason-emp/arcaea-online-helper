@@ -222,6 +222,21 @@ class _ScoreListPageState extends State<ScoreListPage> {
     }
   }
 
+  /// 刷新成绩列表数据（公开方法，供外部调用）
+  Future<void> refreshScores() async {
+    await _loadCachedScores();
+    // 同时重新加载B30数据
+    final b30Data = await _storageService.loadB30Data();
+    if (mounted && b30Data != null) {
+      setState(() {
+        _b30Data = b30Data;
+        _b30Lookup = _buildB30Lookup(b30Data);
+        _best30MinPTT = _computeMinPTT(b30Data.best30);
+        _recent10ReplacementPTT = _computeMinPTT(b30Data.recent10);
+      });
+    }
+  }
+
   void _setupListeners() {
     _fetchService.scoreStream.listen((response) {
       if (mounted) {

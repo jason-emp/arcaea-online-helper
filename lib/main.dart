@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import 'models/app_settings.dart';
+import 'services/background_update_service.dart';
 import 'services/image_generation_manager.dart';
 import 'widgets/arcaea_webview_page.dart';
 import 'widgets/ptt_page.dart';
@@ -27,7 +28,31 @@ void main() async {
     }
   };
 
+  // 启动后台自动更新服务
+  _initBackgroundUpdate();
+
   runApp(const ArcaeaHelperApp());
+}
+
+/// 初始化后台自动更新
+void _initBackgroundUpdate() {
+  final updateService = BackgroundUpdateService();
+
+  // 在后台异步执行更新，不阻塞应用启动
+  Future.delayed(const Duration(seconds: 2), () async {
+    if (kDebugMode) {
+      debugPrint('启动后台自动更新...');
+    }
+
+    try {
+      // 强制更新，忽略时间间隔检查
+      await updateService.performAutoUpdate(forceUpdate: true);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('后台自动更新失败: $e');
+      }
+    }
+  });
 }
 
 /// Arcaea Helper 应用入口
@@ -63,10 +88,14 @@ class MainTabPage extends StatefulWidget {
 class _MainTabPageState extends State<MainTabPage> {
   int _currentIndex = 0;
   final GlobalKey<ArcaeaWebViewPageState> _webViewKey = GlobalKey();
+  final GlobalKey<State<ScoreListPage>> _scoreListKey = GlobalKey();
   bool _lastLoginState = false;
   bool _showWebView = false;
   late final ImageGenerationManager _imageManager;
+  late final BackgroundUpdateService _backgroundUpdateService;
   AppSettings _appSettings = AppSettings();
+  String? _updateStatusMessage;
+  StreamSubscription? _updateStatusSubscription;
 
   @override
   void initState() {
@@ -74,6 +103,47 @@ class _MainTabPageState extends State<MainTabPage> {
     _imageManager = ImageGenerationManager();
     _imageManager.loadFromCache();
     _loadAppSettings();
+    _initBackgroundUpdateListener();
+  }
+
+  /// 初始化后台更新监听
+  void _initBackgroundUpdateListener() {
+    _backgroundUpdateService = BackgroundUpdateService();
+
+    // 监听更新状态
+    _updateStatusSubscription = _backgroundUpdateService.updateStatusStream
+        .listen((status) {
+          if (mounted) {
+            setState(() {
+              _updateStatusMessage = status;
+            });
+
+            // 如果更新完成，刷新成绩列表并清除消息
+            if (status.contains('完成') || status.contains('失败')) {
+              // 如果是成功完成且包含成绩更新，刷新成绩列表
+              if (status.contains('后台更新完成') || status.contains('成绩列表更新完成')) {
+                final scoreListState = _scoreListKey.currentState;
+                if (scoreListState != null) {
+                  try {
+                    (scoreListState as dynamic).refreshScores();
+                  } catch (e) {
+                    if (kDebugMode) {
+                      debugPrint('刷新成绩列表失败: $e');
+                    }
+                  }
+                }
+              }
+
+              Future.delayed(const Duration(seconds: 3), () {
+                if (mounted) {
+                  setState(() {
+                    _updateStatusMessage = null;
+                  });
+                }
+              });
+            }
+          }
+        });
   }
 
   Future<void> _loadAppSettings() async {
@@ -103,9 +173,9 @@ class _MainTabPageState extends State<MainTabPage> {
   Future<void> _generateImage() async {
     final webViewState = _webViewKey.currentState;
     if (webViewState == null) return;
-    
+
     if (mounted) setState(() {});
-    
+
     Timer? updateTimer;
     if (_imageManager.isGenerating) {
       updateTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
@@ -116,10 +186,10 @@ class _MainTabPageState extends State<MainTabPage> {
         }
       });
     }
-    
+
     await webViewState.generateImage();
     updateTimer?.cancel();
-    
+
     if (mounted) setState(() {});
   }
 
@@ -159,10 +229,17 @@ class _MainTabPageState extends State<MainTabPage> {
   }
 
   @override
+  void dispose() {
+    _updateStatusSubscription?.cancel();
+    _backgroundUpdateService.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final webViewState = _webViewKey.currentState;
     final isLoggedIn = webViewState?.scriptManager.state.isTargetPage ?? false;
-    
+
     // 检测登录状态变化
     if (isLoggedIn != _lastLoginState) {
       _lastLoginState = isLoggedIn;
@@ -177,15 +254,17 @@ class _MainTabPageState extends State<MainTabPage> {
         });
       }
     }
-    
-    final int displayIndex = _showWebView 
-        ? _currentIndex 
+
+    final int displayIndex = _showWebView
+        ? _currentIndex
         : (_currentIndex >= 3 ? 3 : _currentIndex);
-    
+
     final scoreListPage = ScoreListPage(
+      key: _scoreListKey,
       imageManager: _imageManager,
-      isActive: (_showWebView && displayIndex == 2) || 
-                (!_showWebView && displayIndex == 1),
+      isActive:
+          (_showWebView && displayIndex == 2) ||
+          (!_showWebView && displayIndex == 1),
     );
 
     final pttPage = PTTPage(
@@ -240,11 +319,57 @@ class _MainTabPageState extends State<MainTabPage> {
     final List<Widget> pages = _showWebView
         ? [pttPage, webViewPage, scoreListPage, settingsPage]
         : [pttPage, scoreListPage, settingsPage, webViewPage];
-    
+
     return Scaffold(
-      body: IndexedStack(
-        index: displayIndex,
-        children: pages,
+      body: Stack(
+        children: [
+          IndexedStack(index: displayIndex, children: pages),
+          // 后台更新状态提示
+          if (_updateStatusMessage != null &&
+              _backgroundUpdateService.isUpdating)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8,
+              left: 16,
+              right: 16,
+              child: Material(
+                elevation: 4,
+                borderRadius: BorderRadius.circular(8),
+                color: Theme.of(context).colorScheme.secondaryContainer,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Theme.of(context).colorScheme.onSecondaryContainer,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _updateStatusMessage!,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSecondaryContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       bottomNavigationBar: _buildBottomNavBar(),
     );
