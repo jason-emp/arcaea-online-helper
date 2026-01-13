@@ -8,9 +8,13 @@ import '../services/song_data_service.dart';
 class ScoreFilterDialog extends StatefulWidget {
   final ScoreFilter initialFilter;
 
+  /// 是否隐藏目标筛选选项（用于好友成绩页等不需要目标的场景）
+  final bool hideTargetFilter;
+
   const ScoreFilterDialog({
     super.key,
     required this.initialFilter,
+    this.hideTargetFilter = false,
   });
 
   @override
@@ -39,7 +43,13 @@ class _ScoreFilterDialogState extends State<ScoreFilterDialog> {
 
   // 定数预设值（9-12的整数和.5）
   static const List<double> constantPresets = [
-    9.0, 9.5, 10.0, 10.5, 11.0, 11.5, 12.0
+    9.0,
+    9.5,
+    10.0,
+    10.5,
+    11.0,
+    11.5,
+    12.0,
   ];
 
   // 成绩预设值
@@ -171,14 +181,11 @@ class _ScoreFilterDialogState extends State<ScoreFilterDialog> {
                   Text(
                     '筛选条件',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        ),
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
                   ),
                   const Spacer(),
-                  TextButton(
-                    onPressed: _clearFilter,
-                    child: const Text('清除'),
-                  ),
+                  TextButton(onPressed: _clearFilter, child: const Text('清除')),
                 ],
               ),
             ),
@@ -205,12 +212,19 @@ class _ScoreFilterDialogState extends State<ScoreFilterDialog> {
                     _buildRangeInput(
                       minController: _constantMinController,
                       maxController: _constantMaxController,
-                      presets: constantPresets.map((v) => v.toString()).toList(),
-                      inputType: const TextInputType.numberWithOptions(decimal: true),
+                      presets: constantPresets
+                          .map((v) => v.toString())
+                          .toList(),
+                      inputType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,1}')),
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d*\.?\d{0,1}'),
+                        ),
                       ],
-                      formatValue: (v) => double.tryParse(v)?.toStringAsFixed(1) ?? v,
+                      formatValue: (v) =>
+                          double.tryParse(v)?.toStringAsFixed(1) ?? v,
                     ),
                     const SizedBox(height: 16),
 
@@ -220,9 +234,13 @@ class _ScoreFilterDialogState extends State<ScoreFilterDialog> {
                       minController: _pttMinController,
                       maxController: _pttMaxController,
                       presets: null,
-                      inputType: const TextInputType.numberWithOptions(decimal: true),
+                      inputType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d*\.?\d{0,2}'),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -234,36 +252,38 @@ class _ScoreFilterDialogState extends State<ScoreFilterDialog> {
                       maxController: _scoreMaxController,
                       presets: scorePresets.keys.toList(),
                       inputType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      presetToValue: (preset) => scorePresets[preset]?.toString() ?? '',
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      presetToValue: (preset) =>
+                          scorePresets[preset]?.toString() ?? '',
                     ),
-                    const SizedBox(height: 16),
 
-                    // 目标
-                    _buildSectionTitle('目标'),
-                    CheckboxListTile(
-                      title: const Text('仅显示有目标的曲目'),
-                      value: _onlyWithTarget,
-                      onChanged: (value) {
-                        setState(() {
-                          _onlyWithTarget = value ?? false;
-                        });
-                      },
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    _buildRangeInput(
-                      minController: _targetMinController,
-                      maxController: _targetMaxController,
-                      presets: scorePresets.keys.toList(),
-                      inputType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      presetToValue: (preset) => scorePresets[preset]?.toString() ?? '',
-                    ),
+                    // 目标（可选隐藏）
+                    if (!widget.hideTargetFilter) ...[
+                      const SizedBox(height: 16),
+                      _buildSectionTitle('目标'),
+                      CheckboxListTile(
+                        title: const Text('仅显示有目标的曲目'),
+                        value: _onlyWithTarget,
+                        onChanged: (value) {
+                          setState(() {
+                            _onlyWithTarget = value ?? false;
+                          });
+                        },
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      _buildRangeInput(
+                        minController: _targetMinController,
+                        maxController: _targetMaxController,
+                        presets: scorePresets.keys.toList(),
+                        inputType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        presetToValue: (preset) =>
+                            scorePresets[preset]?.toString() ?? '',
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -298,10 +318,7 @@ class _ScoreFilterDialogState extends State<ScoreFilterDialog> {
       padding: const EdgeInsets.only(bottom: 8),
       child: Text(
         title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -342,10 +359,7 @@ class _ScoreFilterDialogState extends State<ScoreFilterDialog> {
     }
 
     if (_availablePacks.isEmpty) {
-      return const Text(
-        '暂无可用曲包',
-        style: TextStyle(color: Colors.grey),
-      );
+      return const Text('暂无可用曲包', style: TextStyle(color: Colors.grey));
     }
 
     return Column(
@@ -401,10 +415,7 @@ class _ScoreFilterDialogState extends State<ScoreFilterDialog> {
               final isSelected = _selectedPacks.contains(pack);
               return CheckboxListTile(
                 dense: true,
-                title: Text(
-                  pack,
-                  style: const TextStyle(fontSize: 13),
-                ),
+                title: Text(pack, style: const TextStyle(fontSize: 13)),
                 value: isSelected,
                 onChanged: (selected) {
                   setState(() {

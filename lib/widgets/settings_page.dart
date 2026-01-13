@@ -312,7 +312,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '将清除所有成绩记录、B30/R10 数据、排序设置和登录信息',
+                      '将清除所有成绩记录、B30/R10 数据、搭档数据、排序设置和登录信息',
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
@@ -365,6 +365,7 @@ class _SettingsPageState extends State<SettingsPage> {
           '此操作将永久删除：\n\n'
           '• 所有成绩记录\n'
           '• B30/R10 数据\n'
+          '• 搭档数据\n'
           '• 排序设置\n'
           '• 登录信息（Cookies）\n\n'
           '清除后需要重新登录，此操作无法撤销，确定要继续吗？',

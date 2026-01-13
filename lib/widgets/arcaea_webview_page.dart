@@ -11,6 +11,7 @@ import '../models/app_settings.dart';
 import '../models/b30r10_data.dart';
 import '../services/data_update_service.dart';
 import '../services/image_generation_manager.dart';
+import '../services/partner_storage_service.dart';
 import '../services/score_storage_service.dart';
 import '../services/update_service.dart';
 import '../services/webview_script_manager.dart';
@@ -259,6 +260,10 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     try {
       final storageService = ScoreStorageService();
       await storageService.clearAllData();
+      
+      // 清除搭档数据
+      final partnerStorageService = PartnerStorageService();
+      await partnerStorageService.clearPartners();
       
       _imageManager.cachedData = null;
       

@@ -8,6 +8,8 @@ import 'models/app_settings.dart';
 import 'services/background_update_service.dart';
 import 'services/image_generation_manager.dart';
 import 'widgets/arcaea_webview_page.dart';
+import 'widgets/friend_page.dart';
+import 'widgets/partner_page.dart';
 import 'widgets/ptt_page.dart';
 import 'widgets/score_list_page.dart';
 import 'widgets/settings_page.dart';
@@ -257,15 +259,7 @@ class _MainTabPageState extends State<MainTabPage> {
 
     final int displayIndex = _showWebView
         ? _currentIndex
-        : (_currentIndex >= 3 ? 3 : _currentIndex);
-
-    final scoreListPage = ScoreListPage(
-      key: _scoreListKey,
-      imageManager: _imageManager,
-      isActive:
-          (_showWebView && displayIndex == 2) ||
-          (!_showWebView && displayIndex == 1),
-    );
+        : (_currentIndex >= 4 ? 4 : _currentIndex);
 
     final pttPage = PTTPage(
       imageManager: _imageManager,
@@ -289,6 +283,21 @@ class _MainTabPageState extends State<MainTabPage> {
       settings: _appSettings,
       onSettingsChanged: _handleSettingsChanged,
     );
+
+    final scoreListPage = ScoreListPage(
+      key: _scoreListKey,
+      imageManager: _imageManager,
+      isActive:
+          (_showWebView && displayIndex == 2) ||
+          (!_showWebView && displayIndex == 2),
+    );
+
+    final partnerPage = PartnerPage(
+      settings: _appSettings,
+      onSettingsChanged: _handleSettingsChanged,
+    );
+
+    final friendPage = const FriendPage();
 
     final webViewPage = ArcaeaWebViewPage(
       key: _webViewKey,
@@ -317,8 +326,8 @@ class _MainTabPageState extends State<MainTabPage> {
     );
 
     final List<Widget> pages = _showWebView
-        ? [pttPage, webViewPage, scoreListPage, settingsPage]
-        : [pttPage, scoreListPage, settingsPage, webViewPage];
+        ? [pttPage, webViewPage, scoreListPage, partnerPage, friendPage, settingsPage]
+        : [pttPage, scoreListPage, partnerPage, friendPage, settingsPage, webViewPage];
 
     return Scaffold(
       body: Stack(
@@ -385,17 +394,21 @@ class _MainTabPageState extends State<MainTabPage> {
           BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'PTT'),
           BottomNavigationBarItem(icon: Icon(Icons.web), label: 'WebView'),
           BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: '成绩列表'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_pin), label: '搭档'),
+          BottomNavigationBarItem(icon: Icon(Icons.people_alt), label: '好友'),
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: '设置'),
         ],
       );
     } else {
       return BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        currentIndex: _currentIndex.clamp(0, 2),
+        currentIndex: _currentIndex.clamp(0, 4),
         onTap: _onNavTap,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'PTT'),
           BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: '成绩列表'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_pin), label: '搭档'),
+          BottomNavigationBarItem(icon: Icon(Icons.people_alt), label: '好友'),
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: '设置'),
         ],
       );

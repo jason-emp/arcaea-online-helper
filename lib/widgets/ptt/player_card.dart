@@ -6,11 +6,13 @@ import '../../models/b30r10_data.dart';
 class PlayerCard extends StatelessWidget {
   final PlayerData player;
   final double? pttDifference;
+  final String? partnerIconUrl;
 
   const PlayerCard({
     super.key,
     required this.player,
     this.pttDifference,
+    this.partnerIconUrl,
   });
 
   @override
@@ -43,14 +45,19 @@ class PlayerCard extends StatelessWidget {
         CircleAvatar(
           radius: 32,
           backgroundColor: scheme.primaryContainer,
-          child: Text(
-            player.username.isNotEmpty ? player.username[0] : '?',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: scheme.onPrimaryContainer,
-            ),
-          ),
+          foregroundImage: partnerIconUrl != null 
+              ? NetworkImage(partnerIconUrl!) 
+              : null,
+          child: partnerIconUrl == null
+              ? Text(
+                  player.username.isNotEmpty ? player.username[0] : '?',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: scheme.onPrimaryContainer,
+                  ),
+                )
+              : null,
         ),
         const SizedBox(width: 16),
         Expanded(

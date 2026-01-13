@@ -9,6 +9,7 @@ class AppSettings {
   bool showTargetScore;
   bool showDownloadButtons;
   int extraBestSongsCount;
+  String? selectedPartnerIconUrl;
 
   AppSettings({
     this.showCharts = false,
@@ -17,6 +18,7 @@ class AppSettings {
     this.showTargetScore = true,
     this.showDownloadButtons = true,
     this.extraBestSongsCount = 0,
+    this.selectedPartnerIconUrl,
   });
 
   /// 从SharedPreferences加载设置
@@ -30,6 +32,7 @@ class AppSettings {
         showTargetScore: prefs.getBool(AppConstants.prefShowTargetScore) ?? true,
         showDownloadButtons: prefs.getBool(AppConstants.prefShowDownloadButtons) ?? true,
         extraBestSongsCount: prefs.getInt(AppConstants.prefExtraBestSongsCount) ?? 0,
+        selectedPartnerIconUrl: prefs.getString(AppConstants.prefSelectedPartnerIconUrl),
       );
     } catch (e) {
       return AppSettings();
@@ -46,6 +49,11 @@ class AppSettings {
       await prefs.setBool(AppConstants.prefShowTargetScore, showTargetScore);
       await prefs.setBool(AppConstants.prefShowDownloadButtons, showDownloadButtons);
       await prefs.setInt(AppConstants.prefExtraBestSongsCount, extraBestSongsCount);
+      if (selectedPartnerIconUrl != null) {
+        await prefs.setString(AppConstants.prefSelectedPartnerIconUrl, selectedPartnerIconUrl!);
+      } else {
+        await prefs.remove(AppConstants.prefSelectedPartnerIconUrl);
+      }
     } catch (e) {
       rethrow;
     }
@@ -72,6 +80,7 @@ class AppSettings {
     bool? showTargetScore,
     bool? showDownloadButtons,
     int? extraBestSongsCount,
+    String? selectedPartnerIconUrl,
   }) {
     return AppSettings(
       showCharts: showCharts ?? this.showCharts,
@@ -80,6 +89,7 @@ class AppSettings {
       showTargetScore: showTargetScore ?? this.showTargetScore,
       showDownloadButtons: showDownloadButtons ?? this.showDownloadButtons,
       extraBestSongsCount: extraBestSongsCount ?? this.extraBestSongsCount,
+      selectedPartnerIconUrl: selectedPartnerIconUrl ?? this.selectedPartnerIconUrl,
     );
   }
 }

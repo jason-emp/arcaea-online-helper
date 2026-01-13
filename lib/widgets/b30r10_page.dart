@@ -595,14 +595,19 @@ class _B30R10PageState extends State<B30R10Page> {
                 CircleAvatar(
                   radius: 32,
                   backgroundColor: scheme.primaryContainer,
-                  child: Text(
-                    player.username.isNotEmpty ? player.username[0] : '?',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: scheme.onPrimaryContainer,
-                    ),
-                  ),
+                  foregroundImage: widget.settings.selectedPartnerIconUrl != null 
+                      ? NetworkImage(widget.settings.selectedPartnerIconUrl!) 
+                      : null,
+                  child: widget.settings.selectedPartnerIconUrl == null
+                      ? Text(
+                          player.username.isNotEmpty ? player.username[0] : '?',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: scheme.onPrimaryContainer,
+                          ),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
