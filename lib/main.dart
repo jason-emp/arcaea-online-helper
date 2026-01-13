@@ -7,7 +7,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'models/app_settings.dart';
 import 'services/image_generation_manager.dart';
 import 'widgets/arcaea_webview_page.dart';
-import 'widgets/b30r10_page.dart';
+import 'widgets/ptt_page.dart';
 import 'widgets/score_list_page.dart';
 
 void main() async {
@@ -187,7 +187,7 @@ class _MainTabPageState extends State<MainTabPage> {
                 (!_showWebView && displayIndex == 1),
     );
 
-    final b30r10Page = B30R10Page(
+    final pttPage = PTTPage(
       imageManager: _imageManager,
       isLoggedIn: isLoggedIn,
       onNavigateToWebView: _navigateToWebView,
@@ -218,8 +218,8 @@ class _MainTabPageState extends State<MainTabPage> {
     );
 
     final List<Widget> pages = _showWebView
-        ? [b30r10Page, webViewPage, scoreListPage]
-        : [b30r10Page, scoreListPage, webViewPage];
+        ? [pttPage, webViewPage, scoreListPage]
+        : [pttPage, scoreListPage, webViewPage];
     
     return Scaffold(
       body: IndexedStack(
@@ -236,7 +236,7 @@ class _MainTabPageState extends State<MainTabPage> {
         currentIndex: _currentIndex,
         onTap: _onNavTap,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'B30/R10'),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'PTT'),
           BottomNavigationBarItem(icon: Icon(Icons.web), label: 'WebView'),
           BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: '成绩列表'),
         ],
@@ -246,7 +246,7 @@ class _MainTabPageState extends State<MainTabPage> {
         currentIndex: _currentIndex.clamp(0, 1),
         onTap: _onNavTap,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'B30/R10'),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'PTT'),
           BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: '成绩列表'),
         ],
       );

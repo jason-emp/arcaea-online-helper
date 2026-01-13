@@ -5,14 +5,14 @@ import '../../services/image_generation_manager.dart';
 import '../../services/score_storage_service.dart';
 import '../../services/song_data_service.dart';
 
-/// B30/R10 页面控制器
+/// PTT 页面控制器
 /// 管理页面状态和业务逻辑
-class B30R10PageController {
+class PTTPageController {
   final ImageGenerationManager imageManager;
   final ScoreStorageService storageService;
   final SongDataService songDataService;
   
-  B30R10PageController({
+  PTTPageController({
     required this.imageManager,
     ScoreStorageService? storageService,
     SongDataService? songDataService,

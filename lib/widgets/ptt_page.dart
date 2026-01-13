@@ -8,8 +8,8 @@ import '../services/score_storage_service.dart';
 import '../services/song_data_service.dart';
 import 'settings_dialog.dart';
 
-/// B30/R10 Flutter列表页面
-class B30R10Page extends StatefulWidget {
+/// PTT 数据展示页面
+class PTTPage extends StatefulWidget {
   final ImageGenerationManager imageManager;
   final bool isLoggedIn;
   final VoidCallback onNavigateToWebView;
@@ -33,7 +33,7 @@ class B30R10Page extends StatefulWidget {
   final AppSettings settings;
   final ValueChanged<AppSettings> onSettingsChanged;
 
-  const B30R10Page({
+  const PTTPage({
     super.key,
     required this.imageManager,
     required this.isLoggedIn,
@@ -58,10 +58,10 @@ class B30R10Page extends StatefulWidget {
   });
 
   @override
-  State<B30R10Page> createState() => _B30R10PageState();
+  State<PTTPage> createState() => _PTTPageState();
 }
 
-class _B30R10PageState extends State<B30R10Page> {
+class _PTTPageState extends State<PTTPage> {
   B30R10Data? get _data => widget.imageManager.cachedData;
   bool _hasAutoLoaded = false;
   bool _isLoading = false;
@@ -97,7 +97,7 @@ class _B30R10PageState extends State<B30R10Page> {
   }
 
   @override
-  void didUpdateWidget(B30R10Page oldWidget) {
+  void didUpdateWidget(PTTPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     // 当登录状态变化为已登录，且没有数据时，自动加载
     if (!oldWidget.isLoggedIn &&
@@ -389,7 +389,7 @@ class _B30R10PageState extends State<B30R10Page> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('B30/R10'),
+          title: const Text('PTT'),
           backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         ),
         body: Center(
@@ -416,7 +416,7 @@ class _B30R10PageState extends State<B30R10Page> {
     if (_data == null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('B30/R10'),
+          title: const Text('PTT'),
           backgroundColor: Theme.of(context).colorScheme.primaryContainer,
           actions: [
             IconButton(
@@ -461,14 +461,14 @@ class _B30R10PageState extends State<B30R10Page> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('B30/R10'),
+        title: const Text('PTT'),
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         actions: [
           // 只要有数据就显示生图按钮
           IconButton(
             icon: const Icon(Icons.image),
             onPressed: widget.isGeneratingImage ? null : widget.onGenerateImage,
-            tooltip: '生成B30/R10图片',
+            tooltip: '生成PTT图片',
           ),
           IconButton(
             icon: const Icon(Icons.settings),
