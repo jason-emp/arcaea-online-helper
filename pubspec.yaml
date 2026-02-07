@@ -35,10 +35,6 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   assets:
-    - web/js/arcaea-calculator.js
-    - web/js/arcaea-data-loader.js
-    - web/js/flutter-content.js
-    - web/css/arcaea-styles.css
     - assets/data/ChartConstant.json
     - assets/data/Songlist.json
     - assets/data/chart-data.json

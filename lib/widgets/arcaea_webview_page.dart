@@ -1,8 +1,5 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -82,7 +79,6 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   }
 
   Future<void> _initializeAsync() async {
-    await _scriptManager.preloadAssets();
     await _initializeVersionAndUpdateCheck();
     await _loadLastDataUpdateTime();
   }
@@ -374,22 +370,7 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
 
   void _onWebViewCreated(InAppWebViewController controller) {
     webViewController = controller;
-
-    controller.addJavaScriptHandler(
-      handlerName: AppConstants.getSharedAssetHandler,
-      callback: (args) async {
-        final assetPath = args[0] as String;
-        return await rootBundle.loadString(assetPath);
-      },
-    );
-
-    controller.addJavaScriptHandler(
-      handlerName: AppConstants.exportB30R10DataHandler,
-      callback: (args) {
-        _scriptManager.handleB30R10DataExport(args);
-        return null;
-      },
-    );
+    // 不再需要 JS Handler：数据通过 Flutter 侧提取，无脚本注入
   }
 
   void _onLoadStart(InAppWebViewController controller, WebUri? url) {
@@ -398,10 +379,6 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     final isTarget = _scriptManager.isTargetUrl(rawUrl);
 
     if (isTarget) {
-      _scriptManager.state.hasInjectedScript = false;
-      _scriptManager.state.hasTriggeredProcessing = false;
-      _scriptManager.state.aggressiveAttempts = 0;
-      _scriptManager.stopAggressiveLoop();
       _scriptManager.cancelTargetPageGraceTimer();
       _scriptManager.state.isTargetPage = true;
     } else if (wasTargetPage && !isTarget) {
@@ -436,68 +413,15 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     final urlString = url?.toString() ?? '';
     final isTarget = _scriptManager.isTargetUrl(urlString);
 
-    if (isReload == true && isTarget) {
-      _scriptManager.state.hasInjectedScript = false;
-      _scriptManager.state.hasTriggeredProcessing = false;
-      _scriptManager.state.aggressiveAttempts = 0;
-      _scriptManager.stopAggressiveLoop();
+    if (isTarget) {
       _scriptManager.cancelTargetPageGraceTimer();
       _scriptManager.state.isTargetPage = true;
-      _scriptManager.state.lastTargetPageTime = null;
-
       setState(() {
         currentUrl = urlString;
       });
 
-      await Future.delayed(const Duration(milliseconds: 1000));
-      final domReady = await _scriptManager.checkDOMReady(controller);
-
-      if (!domReady) {
-        await Future.delayed(AppConstants.domCheckDelay);
-      }
-
-      _scriptManager.startAggressiveInjectionLoop(
-        controller,
-        widget.settings,
-        reason: 'reload',
-        forceRestart: true,
-      );
-      return;
-    }
-
-    if (isTarget) {
-      _scriptManager.cancelTargetPageGraceTimer();
-
-      final now = DateTime.now();
-      final isQuickReturn = _scriptManager.state.lastTargetPageTime != null &&
-          now.difference(_scriptManager.state.lastTargetPageTime!) < AppConstants.targetPageGracePeriod;
-
-      if (!_scriptManager.state.isTargetPage || isQuickReturn) {
-        _scriptManager.state.isTargetPage = true;
-        setState(() {
-          currentUrl = urlString;
-        });
-
-        if (isQuickReturn) {
-          _scriptManager.state.hasInjectedScript = false;
-          _scriptManager.state.hasTriggeredProcessing = false;
-          _scriptManager.state.aggressiveAttempts = 0;
-          _scriptManager.stopAggressiveLoop();
-        }
-
-        await Future.delayed(const Duration(milliseconds: 1000));
-        final domReady = await _scriptManager.checkDOMReady(controller);
-
-        if (!domReady) {
-          await Future.delayed(AppConstants.domCheckDelay);
-        }
-
-        _scriptManager.startAggressiveInjectionLoop(
-          controller,
-          widget.settings,
-          reason: 'updateVisitedHistory',
-          forceRestart: true,
-        );
+      if (isReload == true) {
+        await _tryExtractData(controller);
       }
     } else if (!isTarget && _scriptManager.state.isTargetPage) {
       _scriptManager.startTargetPageGraceTimer(() {});
@@ -515,22 +439,22 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     _scriptManager.state.isTargetPage = isTarget;
 
     if (isTarget) {
-      await Future.delayed(AppConstants.initialDelay);
+      await _tryExtractData(controller);
+    }
+  }
 
-      final domReady = await _scriptManager.checkDOMReady(controller);
+  /// 等待 DOM 就绪后从页面提取 B30/R10 数据（Flutter 侧处理，无脚本注入）
+  Future<void> _tryExtractData(InAppWebViewController controller) async {
+    await Future.delayed(AppConstants.initialDelay);
 
-      if (!domReady) {
-        await Future.delayed(AppConstants.domCheckDelay);
-      }
+    var domReady = await _scriptManager.checkDOMReady(controller);
+    if (!domReady) {
+      await Future.delayed(AppConstants.domCheckDelay);
+      domReady = await _scriptManager.checkDOMReady(controller);
+    }
 
-      _scriptManager.startAggressiveInjectionLoop(
-        controller,
-        widget.settings,
-        reason: 'loadStop',
-        forceRestart: true,
-      );
-    } else {
-      _scriptManager.stopAggressiveLoop();
+    if (domReady) {
+      await _scriptManager.extractB30R10Data(controller);
     }
   }
 
@@ -538,15 +462,6 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     final resourceUrl = resource.url?.toString() ?? '';
     if (_scriptManager.isTargetUrl(resourceUrl)) {
       _scriptManager.state.isTargetPage = true;
-      if (_scriptManager.state.aggressiveLoopActive) {
-        _scriptManager.state.aggressiveAttempts = 0;
-      } else {
-        _scriptManager.startAggressiveInjectionLoop(
-          controller,
-          widget.settings,
-          reason: 'resource',
-        );
-      }
     }
   }
 
@@ -564,7 +479,6 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     if (kDebugMode) {
       debugPrint('[WebView Error] URL: ${request.url}, Error: ${error.description}, Type: ${error.type}');
     }
-    _scriptManager.stopAggressiveLoop();
   }
 
   void _onReceivedHttpError(
@@ -574,10 +488,6 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   ) {
     if (kDebugMode) {
       debugPrint('[WebView HTTP Error] URL: ${request.url}, Status: ${response.statusCode}');
-    }
-    final statusCode = response.statusCode;
-    if (statusCode != null && statusCode >= 400) {
-      _scriptManager.stopAggressiveLoop();
     }
   }
 
