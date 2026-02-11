@@ -282,17 +282,24 @@ class _MainTabPageState extends State<MainTabPage> {
     final isLoggedIn = webViewState?.scriptManager.state.isTargetPage ?? false;
 
     // 检测登录状态变化
+    // 只在用户当前在WebView页面时才自动跳回PTT页，避免在用户切换到其他页面时强制跳转
     if (isLoggedIn != _lastLoginState) {
       _lastLoginState = isLoggedIn;
       if (isLoggedIn) {
-        Future.delayed(const Duration(milliseconds: 100), () {
-          if (mounted) {
-            setState(() {
-              _showWebView = false;
-              _currentIndex = 0;
-            });
-          }
-        });
+        // 只有在用户当前正在查看WebView页面时才自动跳回PTT页
+        // 条件：_showWebView == true 且 _currentIndex == 1（WebView页面）
+        // 如果用户已经切换到其他页面，不要强制跳转
+        final isCurrentlyViewingWebView = _showWebView && _currentIndex == 1;
+        if (isCurrentlyViewingWebView) {
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (mounted) {
+              setState(() {
+                _showWebView = false;
+                _currentIndex = 0;
+              });
+            }
+          });
+        }
       }
     }
 

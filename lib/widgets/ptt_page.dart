@@ -62,7 +62,8 @@ class PTTPage extends StatefulWidget {
 
 class _PTTPageState extends State<PTTPage> {
   B30R10Data? get _data => widget.imageManager.cachedData;
-  bool _hasAutoLoaded = false;
+  // 使用静态变量跟踪是否已经自动加载过，避免每次重建时都触发
+  static bool _hasAutoLoadedOnce = false;
   bool _isLoading = false;
   bool _loadFailed = false;
   int _retryCount = 0;
@@ -74,47 +75,95 @@ class _PTTPageState extends State<PTTPage> {
   List<SongCardData> _extraBestSongs = [];
   bool _isLoadingExtraSongs = false;
   String? _extraSongsMessage;
+  // 跟踪上次的登录状态，避免重复处理登录状态变化
+  bool _lastLoggedInState = false;
 
   @override
   void initState() {
     super.initState();
-    // 启动时总是尝试自动加载数据（无论是否登录）
-    if (_data == null && !_hasAutoLoaded) {
-      _hasAutoLoaded = true;
+    widget.imageManager.addListener(_handleImageManagerChange);
+    // 预加载歌曲定数数据，保证与成绩列表页的定数表保持一致
+    _initSongData();
+    // 初始化登录状态
+    _lastLoggedInState = widget.isLoggedIn;
+    // PTT页应完全按照实时WebView内容显示，不应使用缓存数据
+    // 启动时总是先刷新WebView页面，确保获取最新数据
+    // 但如果已经有缓存数据，说明已经加载过，不需要再次自动加载
+    if (!_hasAutoLoadedOnce && _data == null) {
+      _hasAutoLoadedOnce = true;
       _isLoading = true;
+      // 清除可能存在的缓存数据，强制从WebView获取最新数据
+      widget.imageManager.cachedData = null;
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
-          // 启动时也先刷新WebView页面,确保获取最新数据
+          // 启动时先刷新WebView页面,确保获取最新数据
           _refreshWebViewAndData();
         }
       });
-    }
-
-    if (_data != null && widget.settings.extraBestSongsCount > 0) {
-      _loadExtraBestSongs();
     }
   }
 
   @override
   void didUpdateWidget(PTTPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 当登录状态变化为已登录，且没有数据时，自动加载
-    if (!oldWidget.isLoggedIn &&
+    // 当登录状态变化为已登录时，清除缓存并重新从WebView获取最新数据
+    // 但只在登录状态真正变化时处理，避免重复触发
+    // 注意：不要在 didUpdateWidget 中直接修改 cachedData，因为这会触发监听器
+    // 而监听器可能在 build 过程中调用 setState，导致错误
+    if (!_lastLoggedInState &&
         widget.isLoggedIn &&
-        _data == null &&
         !_isLoading) {
+      _lastLoggedInState = widget.isLoggedIn;
       _loadFailed = false;
       _retryCount = 0;
-      Future.delayed(const Duration(milliseconds: 300), () {
+      // 使用 addPostFrameCallback 延迟到 build 完成后执行，避免在 build 过程中调用 setState
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          // 登录后也先刷新页面再获取数据
-          _refreshWebViewAndData();
+          // 只有在当前页面可见时才清除缓存并刷新
+          // 由于 IndexedStack 的特性，所有页面都会被创建，但只有当前显示的页面是"可见"的
+          // 这里我们通过检查是否有数据来判断是否需要刷新
+          // 如果已经有数据，说明可能是在后台加载的，不需要立即刷新
+          if (_data == null) {
+            // 清除缓存数据，强制从WebView获取最新数据
+            widget.imageManager.cachedData = null;
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (mounted) {
+                // 登录后先刷新页面再获取数据
+                _refreshWebViewAndData();
+              }
+            });
+          }
         }
       });
+    } else if (_lastLoggedInState != widget.isLoggedIn) {
+      // 更新状态，但不触发刷新（可能是从已登录变为未登录）
+      _lastLoggedInState = widget.isLoggedIn;
     }
 
     if (oldWidget.settings.extraBestSongsCount !=
         widget.settings.extraBestSongsCount) {
+      _loadExtraBestSongs();
+    }
+
+    if (oldWidget.imageManager != widget.imageManager) {
+      oldWidget.imageManager.removeListener(_handleImageManagerChange);
+      widget.imageManager.addListener(_handleImageManagerChange);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.imageManager.removeListener(_handleImageManagerChange);
+    super.dispose();
+  }
+
+  /// 当 imageManager 数据变化时（如 WebView 加载后自动提取），同步更新 PTT 页显示
+  void _handleImageManagerChange() {
+    if (!mounted) return;
+    setState(() {});
+    final data = _data;
+    if (data != null && !_isLoading) {
+      _comparePTT();
       _loadExtraBestSongs();
     }
   }
@@ -370,7 +419,11 @@ class _PTTPageState extends State<PTTPage> {
   }
 
   /// 刷新WebView并重新获取数据
+  /// PTT页应完全按照实时WebView内容显示，因此清除缓存并重新获取
   Future<void> _refreshWebViewAndData() async {
+    // 清除缓存数据，确保获取最新数据
+    widget.imageManager.cachedData = null;
+    
     // 先刷新WebView页面
     widget.onRefreshWebView();
 
@@ -931,7 +984,22 @@ class _PTTPageState extends State<PTTPage> {
   Widget _buildSongCard(SongCardData song, bool isRecent) {
     final accentColor = isRecent ? Colors.orange : Colors.blue;
     final prefix = isRecent ? 'R' : '#';
-    final targetScore = _calculateTargetScore(song);
+
+    // 使用本地定数表优先生效，保证与定数页一致
+    final effectiveConstant = _songDataService.isLoaded
+        ? (_songDataService.getConstant(song.songTitle, song.difficulty) ??
+            song.constant)
+        : song.constant;
+
+    final effectivePlayPTT = song.playPTT ??
+        (effectiveConstant != null
+            ? _calculatePlayPTT(song.score, effectiveConstant)
+            : null);
+
+    final targetScore = _calculateTargetScoreWithConstant(
+      song,
+      effectiveConstant,
+    );
     final difficultyColor = _getDifficultyColor(song.difficulty);
     final grade = _getScoreGrade(song.score);
     final gradeColor = _getGradeColor(grade);
@@ -982,9 +1050,9 @@ class _PTTPageState extends State<PTTPage> {
                                         song.difficulty,
                                         difficultyColor,
                                       ),
-                                      if (song.constant != null)
+                                      if (effectiveConstant != null)
                                         Text(
-                                          '定数 ${song.constant!.toStringAsFixed(1)}',
+                                          '定数 ${effectiveConstant.toStringAsFixed(1)}',
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: Colors.grey[600],
@@ -1021,10 +1089,10 @@ class _PTTPageState extends State<PTTPage> {
                           spacing: 12,
                           runSpacing: 8,
                           children: [
-                            if (song.playPTT != null)
+                            if (effectivePlayPTT != null)
                               _buildInfoPill(
                                 label: '单曲 PTT',
-                                value: song.playPTT!.toStringAsFixed(4),
+                                value: effectivePlayPTT.toStringAsFixed(4),
                                 icon: Icons.data_exploration,
                               ),
                             if (targetScore != null)
@@ -1211,6 +1279,13 @@ class _PTTPageState extends State<PTTPage> {
 
   /// 显示歌曲详情
   void _showSongDetails(SongCardData song) {
+    final constant = _songDataService.isLoaded
+        ? (_songDataService.getConstant(song.songTitle, song.difficulty) ??
+            song.constant)
+        : song.constant;
+    final playPTT = song.playPTT ??
+        (constant != null ? _calculatePlayPTT(song.score, constant) : null);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1221,10 +1296,10 @@ class _PTTPageState extends State<PTTPage> {
           children: [
             _buildDetailRow('难度', song.difficulty),
             _buildDetailRow('分数', _formatScore(song.score)),
-            if (song.constant != null)
-              _buildDetailRow('定数', song.constant!.toStringAsFixed(1)),
-            if (song.playPTT != null)
-              _buildDetailRow('PTT', song.playPTT!.toStringAsFixed(4)),
+            if (constant != null)
+              _buildDetailRow('定数', constant.toStringAsFixed(1)),
+            if (playPTT != null)
+              _buildDetailRow('PTT', playPTT.toStringAsFixed(4)),
           ],
         ),
         actions: [
@@ -1257,11 +1332,14 @@ class _PTTPageState extends State<PTTPage> {
   }
 
   /// 计算目标分数（使PTT +0.01）
-  int? _calculateTargetScore(SongCardData song) {
-    if (song.constant == null || _data?.player.totalPTT == null) return null;
+  int? _calculateTargetScoreWithConstant(
+    SongCardData song,
+    double? constant,
+  ) {
+    if (constant == null || _data?.player.totalPTT == null) return null;
     if (song.score >= 10000000) return null;
     return PTTCalculator.calculateTargetScore(
-      constant: song.constant!,
+      constant: constant,
       currentScore: song.score,
       totalPTT: _data!.player.totalPTT!,
     );
@@ -1291,6 +1369,18 @@ class _PTTPageState extends State<PTTPage> {
 
   String _buildSongKey(String title, String difficulty) {
     return '${title.trim().toLowerCase()}|${difficulty.trim().toUpperCase()}';
+  }
+
+  /// 预加载歌曲定数数据
+  Future<void> _initSongData() async {
+    try {
+      await _songDataService.ensureLoaded();
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (_) {
+      // 静默失败，PTT 页依然可以正常使用，只是无法使用本地定数表
+    }
   }
 }
 

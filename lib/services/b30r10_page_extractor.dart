@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import '../core/utils/ptt_calculator.dart';
@@ -14,25 +13,46 @@ const String _extractRawDataScript = r'''
   const diffMap = {'PST':0,'PAST':0,'PRS':1,'PRESENT':1,'FTR':2,'FUTURE':2,'BYD':3,'BEYOND':3,'ETR':4,'ETERNAL':4};
   const diffNames = ['PST','PRS','FTR','BYD','ETR'];
   
+  // 寻找包含分数的所有元素
+  const allCards = document.querySelectorAll('.card, [class*="card"]');
+  let songCardElements = [];
+  for (const el of allCards) {
+    const t = el.innerText || '';
+    const hasScore = /\d{1,3}(,\d{3}){2}/.test(t) || /\d{7,8}/.test(t);
+    const hasDiff = /FTR|BYD|PRS|PST|ETR|FUTURE|BEYOND|PRESENT|PAST|ETERNAL/i.test(t);
+    if (hasScore && hasDiff && t.length > 20) {
+      songCardElements.push(el);
+    }
+  }
+  
   function getDifficulty(el) {
     const labels = el.querySelectorAll('span.label, .label, span');
     for (const l of labels) {
       const t = (l.textContent||'').trim().toUpperCase();
       if (diffMap[t] !== undefined) return diffMap[t];
     }
+    // 回退：检查 class 名称中的难度
+    for (const child of el.querySelectorAll('*')) {
+      const cls = (child.className || '').toUpperCase();
+      for (const d of Object.keys(diffMap)) {
+        if (cls.includes(d)) return diffMap[d];
+      }
+    }
     return -1;
   }
   
   function getTitleAndScore(el) {
     let title=null, score=null;
-    for (const s of el.querySelectorAll('span.no-overflow, .title span, .title .no-overflow, [class*="title"]')) {
+    // 扩展标题选择器
+    for (const s of el.querySelectorAll('span.no-overflow, .title span, .title .no-overflow, [class*="title"], .song-title, .name')) {
       const t = (s.textContent||'').trim();
       if (t.length>0 && t.length<60 && !/^\d+$/.test(t) && !t.includes('潜力值')) {
         title = t.replace(/\s*\([\d.]+\)\s*$/,'').trim();
         break;
       }
     }
-    const scoreEls = el.querySelectorAll('.ex-main, [class*="ex-main"], .score');
+    // 扩展分数选择器
+    const scoreEls = el.querySelectorAll('.ex-main, [class*="ex-main"], .score, [class*="score"]');
     for (const e of scoreEls) {
       const m = (e.textContent||'').match(/(\d{1,3}(,\d{3})*|\d{7,8})/);
       if (m) {
@@ -50,6 +70,19 @@ const String _extractRawDataScript = r'''
         if (m) {
           const n = parseInt(m[0].replace(/,/g,''),10);
           if (n>=5000000 && n<=10002000) { score = n; break; }
+        }
+      }
+    }
+    // 如果标题还没找到，尝试从整个卡片文本中提取
+    if (!title) {
+      const allText = (el.innerText || '').split('\n').map(s => s.trim()).filter(s => s.length > 0);
+      for (const line of allText) {
+        if (line.length > 2 && line.length < 60 && !/^\d+$/.test(line) && 
+            !/(FTR|BYD|PRS|PST|ETR|FUTURE|BEYOND|PRESENT|PAST|ETERNAL)/i.test(line) &&
+            !/\d{7,8}/.test(line) && !/\d{1,3}(,\d{3}){2}/.test(line) &&
+            !line.includes('潜力值')) {
+          title = line;
+          break;
         }
       }
     }
@@ -81,11 +114,38 @@ const String _extractRawDataScript = r'''
   }
   
   const cards = [];
+  
+  // 策略1: 从 card-list 容器中查找
   const lists = document.querySelectorAll('.card-list, [class*="card-list"]');
   for (const list of lists) {
-    const elms = list.querySelectorAll('[data-v-b3942f14].card');
+    let elms = list.querySelectorAll('.card');
+    if (elms.length === 0) {
+      elms = list.children;
+    }
     for (const el of elms) {
       if (!isSongCard(el)) continue;
+      const {title, score} = getTitleAndScore(el);
+      const diff = getDifficulty(el);
+      if (!title || score==null || diff<0) continue;
+      cards.push({title, score, difficulty: diff, coverUrl: getCoverUrl(el)});
+    }
+  }
+  
+  // 策略2: 如果策略1 没找到，直接从之前发现的 songCardElements 中提取
+  if (cards.length === 0 && songCardElements.length > 0) {
+    // 去重：用最内层的包含分数+难度的元素
+    const used = new Set();
+    for (const el of songCardElements) {
+      // 跳过太大的容器（可能是整个列表）
+      if ((el.innerText||'').length > 2000) continue;
+      // 检查是否被其他已选中的元素包含
+      let dominated = false;
+      for (const other of used) {
+        if (other.contains(el) || el.contains(other)) { dominated = true; break; }
+      }
+      if (dominated) continue;
+      used.add(el);
+      
       const {title, score} = getTitleAndScore(el);
       const diff = getDifficulty(el);
       if (!title || score==null || diff<0) continue;
@@ -118,6 +178,7 @@ class B30R10PageExtractor {
       _log('开始从页面提取原始数据（无脚本注入）');
 
       final result = await controller.evaluateJavascript(source: _extractRawDataScript);
+      
       if (result == null) {
         _log('提取返回空');
         return null;
@@ -216,7 +277,6 @@ class B30R10PageExtractor {
       return data;
     } catch (e, st) {
       _log('提取失败: $e\n$st');
-      if (kDebugMode) debugPrint('[B30R10PageExtractor] $e\n$st');
       return null;
     }
   }

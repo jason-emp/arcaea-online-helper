@@ -30,6 +30,9 @@ class _ScoreListPageState extends State<ScoreListPage> {
   final ScoreStorageService _storageService = ScoreStorageService();
   final SongDataService _songDataService = SongDataService();
   final TextEditingController _searchController = TextEditingController();
+   // 定数表搜索
+  final TextEditingController _constantSearchController =
+      TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
   List<ScoreData> _scores = [];
@@ -43,12 +46,19 @@ class _ScoreListPageState extends State<ScoreListPage> {
   bool _isLoading = true;
   bool _hasFetched = false;
   bool _isSongDataReady = false;
+  bool _isConstantTableLoading = true;
   double? _playerPTT;
   ImageGenerationManager? _attachedImageManager;
   Map<String, _B30EntryInfo> _b30Lookup = {};
   B30R10Data? _b30Data;
   double? _best30MinPTT;
   double? _recent10ReplacementPTT;
+
+  // 定数表数据
+  List<SongChartInfo> _allChartInfos = [];
+  Map<double, List<SongChartInfo>> _groupedChartInfos = {};
+  List<double> _sortedConstants = [];
+  String _constantSearchQuery = '';
 
   @override
   void initState() {
@@ -59,6 +69,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
     _loadCachedScores();
     _loadSortOption();
     _searchController.addListener(_onSearchChanged);
+    _constantSearchController.addListener(_onConstantSearchChanged);
     _scrollController.addListener(_onScroll);
   }
 
@@ -166,13 +177,28 @@ class _ScoreListPageState extends State<ScoreListPage> {
   Future<void> _loadSongMetadata() async {
     try {
       await _songDataService.ensureLoaded();
+      final charts = _songDataService.getAllChartInfos();
       if (mounted) {
         setState(() {
           _isSongDataReady = true;
+          _isConstantTableLoading = false;
+          _allChartInfos = charts;
+          _applyConstantTableFilter();
         });
+      } else {
+        _isSongDataReady = true;
+        _isConstantTableLoading = false;
+        _allChartInfos = charts;
+        _applyConstantTableFilter();
       }
     } catch (e) {
-      // 忽略加载错误
+      if (mounted) {
+        setState(() {
+          _isConstantTableLoading = false;
+        });
+      } else {
+        _isConstantTableLoading = false;
+      }
     }
   }
 
@@ -296,6 +322,14 @@ class _ScoreListPageState extends State<ScoreListPage> {
     });
   }
 
+  /// 定数表搜索文本变化处理
+  void _onConstantSearchChanged() {
+    setState(() {
+      _constantSearchQuery = _constantSearchController.text.toLowerCase();
+      _applyConstantTableFilter();
+    });
+  }
+
   /// 应用搜索过滤和排序
   void _applyFilterAndSort() {
     // 1. 先过滤（搜索）
@@ -313,6 +347,36 @@ class _ScoreListPageState extends State<ScoreListPage> {
 
     // 3. 最后排序
     _filteredScores = _sortScores(filtered, _currentSortOption);
+  }
+
+  /// 应用定数表过滤（搜索）并按定数分组降序排列
+  void _applyConstantTableFilter() {
+    List<SongChartInfo> filtered = _allChartInfos;
+
+    // 搜索：曲名 / 曲师 / 歌曲 ID
+    if (_constantSearchQuery.isNotEmpty) {
+      filtered = filtered.where((info) {
+        final title = info.title.toLowerCase();
+        final artist = info.artist.toLowerCase();
+        final id = info.songId.toLowerCase();
+        return title.contains(_constantSearchQuery) ||
+            artist.contains(_constantSearchQuery) ||
+            id.contains(_constantSearchQuery);
+      }).toList();
+    }
+
+    // 按定数分组
+    final Map<double, List<SongChartInfo>> grouped = {};
+    for (final info in filtered) {
+      final constant = info.constant;
+      grouped.putIfAbsent(constant, () => []).add(info);
+    }
+
+    // 按定数降序排序
+    final sortedConstants = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    _groupedChartInfos = grouped;
+    _sortedConstants = sortedConstants;
   }
 
   /// 应用筛选条件
@@ -746,6 +810,7 @@ class _ScoreListPageState extends State<ScoreListPage> {
     _fetchService.dispose();
     _detachImageManager();
     _searchController.dispose();
+    _constantSearchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -922,227 +987,253 @@ class _ScoreListPageState extends State<ScoreListPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('成绩列表'),
-        actions: [
-          // 筛选按钮
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.filter_list),
-                tooltip: '筛选',
-                onPressed: _showFilterDialog,
-              ),
-              if (_currentFilter.hasAnyFilter)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('成绩列表'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: '成绩'),
+              Tab(text: '定数表'),
+            ],
+          ),
+          actions: [
+            // 筛选按钮（仅对成绩标签有效，但始终显示）
+            Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.filter_list),
+                  tooltip: '筛选',
+                  onPressed: _showFilterDialog,
+                ),
+                if (_currentFilter.hasAnyFilter)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          // 排序菜单
-          PopupMenuButton<ScoreSortOption>(
-            icon: const Icon(Icons.sort),
-            tooltip: '排序方式',
-            onSelected: _saveSortOption,
-            itemBuilder: (context) => ScoreSortOption.values.map((option) {
-              return PopupMenuItem<ScoreSortOption>(
-                value: option,
-                child: Row(
-                  children: [
-                    if (option == _currentSortOption)
-                      const Icon(Icons.check, size: 18)
-                    else
-                      const SizedBox(width: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(option.label),
-                          Text(
-                            option.description,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-          // 更多菜单
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'clear') {
-                _clearCache();
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'clear',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete_outline),
-                    SizedBox(width: 8),
-                    Text('清除缓存'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // 搜索栏
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: '搜索曲名或曲师...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-              ),
+              ],
             ),
-          ),
-          // 筛选状态显示
-          if (_currentFilter.hasAnyFilter)
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.symmetric(horizontal: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.primaryContainer.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            // 排序菜单
+            PopupMenuButton<ScoreSortOption>(
+              icon: const Icon(Icons.sort),
+              tooltip: '排序方式',
+              onSelected: _saveSortOption,
+              itemBuilder: (context) =>
+                  ScoreSortOption.values.map((option) {
+                return PopupMenuItem<ScoreSortOption>(
+                  value: option,
+                  child: Row(
                     children: [
-                      Icon(
-                        Icons.filter_alt,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '已应用筛选条件',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
+                      if (option == _currentSortOption)
+                        const Icon(Icons.check, size: 18)
+                      else
+                        const SizedBox(width: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(option.label),
+                            Text(
+                              option.description,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: _clearFilter,
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text('清除', style: TextStyle(fontSize: 12)),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: _currentFilter
-                        .getActiveFilterDescriptions()
-                        .map(
-                          (desc) => Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              desc,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ],
-              ),
+                );
+              }).toList(),
             ),
-          // 成绩列表
-          Expanded(child: _buildScoreList()),
-        ],
-      ),
-      floatingActionButton: _isFetching
-          ? null
-          : Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                // 回到顶部按钮
-                if (_showScrollToTop)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: FloatingActionButton(
-                      heroTag: 'scrollToTop',
-                      onPressed: _scrollToTop,
-                      child: const Icon(Icons.arrow_upward),
-                    ),
+            // 更多菜单
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'clear') {
+                  _clearCache();
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'clear',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline),
+                      SizedBox(width: 8),
+                      Text('清除缓存'),
+                    ],
                   ),
-                // 拉取/更新成绩按钮
-                FloatingActionButton.extended(
-                  heroTag: 'fetchScores',
-                  onPressed: _hasFetched ? _startUpdating : _startFetching,
-                  icon: Icon(_hasFetched ? Icons.refresh : Icons.download),
-                  label: Text(_hasFetched ? '更新成绩' : '拉取成绩'),
                 ),
               ],
             ),
+          ],
+        ),
+        body: TabBarView(
+          children: [
+            // 成绩标签页
+            Column(
+              children: [
+                // 搜索栏
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: '搜索曲名或曲师...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _searchController.clear();
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                // 筛选状态显示
+                if (_currentFilter.hasAnyFilter)
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primaryContainer.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.filter_alt,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '已应用筛选条件',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color:
+                                    Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                            const Spacer(),
+                            TextButton(
+                              onPressed: _clearFilter,
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text(
+                                '清除',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: _currentFilter
+                              .getActiveFilterDescriptions()
+                              .map(
+                                (desc) => Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    desc,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimaryContainer,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                // 成绩列表
+                Expanded(child: _buildScoreList()),
+              ],
+            ),
+            // 定数表标签页
+            _buildConstantTableTab(),
+          ],
+        ),
+        floatingActionButton: _isFetching
+            ? null
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // 回到顶部按钮（仅对成绩列表使用）
+                  if (_showScrollToTop)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: FloatingActionButton(
+                        heroTag: 'scrollToTop',
+                        onPressed: _scrollToTop,
+                        child: const Icon(Icons.arrow_upward),
+                      ),
+                    ),
+                  // 拉取/更新成绩按钮
+                  FloatingActionButton.extended(
+                    heroTag: 'fetchScores',
+                    onPressed: _hasFetched
+                        ? _startUpdating
+                        : _startFetching,
+                    icon:
+                        Icon(_hasFetched ? Icons.refresh : Icons.download),
+                    label:
+                        Text(_hasFetched ? '更新成绩' : '拉取成绩'),
+                  ),
+                ],
+              ),
+      ),
     );
   }
 
@@ -1273,6 +1364,144 @@ class _ScoreListPageState extends State<ScoreListPage> {
           targetSource: targetSource,
         );
       },
+    );
+  }
+
+  /// 定数表标签页
+  Widget _buildConstantTableTab() {
+    if (_isConstantTableLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (!_isSongDataReady || _allChartInfos.isEmpty) {
+      return Center(
+        child: Text(
+          '暂无定数数据',
+          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        // 搜索栏
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: TextField(
+            controller: _constantSearchController,
+            decoration: InputDecoration(
+              hintText: '搜索曲名、曲师或ID...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _constantSearchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _constantSearchController.clear();
+                      },
+                    )
+                  : null,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+            ),
+          ),
+        ),
+        // 定数列表（按定数分组降序显示）
+        Expanded(
+          child: _sortedConstants.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search_off, size: 80, color: Colors.grey[400]),
+                      const SizedBox(height: 16),
+                      Text(
+                        '未找到匹配的谱面',
+                        style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '尝试其他关键词',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _sortedConstants.length,
+                  itemBuilder: (context, constantIndex) {
+                    final constant = _sortedConstants[constantIndex];
+                    final charts = _groupedChartInfos[constant] ?? [];
+                    
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 定数组标题
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primaryContainer,
+                          ),
+                          child: Text(
+                            '定数 ${constant.toStringAsFixed(1)}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                        // 该定数下的所有谱面
+                        ...charts.map((info) {
+                          final title =
+                              (info.title.isNotEmpty ? info.title : info.songId).trim();
+                          final subtitleParts = <String>[];
+                          if (info.artist.isNotEmpty) {
+                            subtitleParts.add(info.artist);
+                          }
+                          if (info.pack.isNotEmpty) {
+                            subtitleParts.add('包：${info.pack}');
+                          }
+
+                          return ListTile(
+                            title: Text(
+                              title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: subtitleParts.isNotEmpty
+                                ? Text(
+                                    subtitleParts.join(' · '),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  )
+                                : null,
+                            trailing: Text(
+                              DifficultyUtils.normalizeDifficulty(info.difficulty),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          );
+                        }),
+                        // 组间分隔线
+                        if (constantIndex < _sortedConstants.length - 1)
+                          const Divider(height: 1),
+                      ],
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 

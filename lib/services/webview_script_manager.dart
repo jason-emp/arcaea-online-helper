@@ -48,16 +48,67 @@ class WebViewScriptManager {
     }
   }
 
-  /// 检查页面 DOM 是否已就绪（卡片是否加载）
+  /// 判断 URL 是否为登录页面（带重定向参数）
+  /// 登录页面可能会重定向回目标页面，所以不应该清除 isTargetPage 状态
+  bool isLoginPageWithRedirect(String? rawUrl) {
+    if (rawUrl == null || rawUrl.isEmpty) return false;
+    try {
+      final uri = Uri.parse(rawUrl);
+      // 检查是否是登录页面且包含 redirect-path 参数
+      final isLoginPage = uri.path.contains('/login') || uri.path.contains('/zh/login');
+      final hasRedirect = uri.queryParameters.containsKey('redirect-path') ||
+          rawUrl.contains('redirect-path');
+      return uri.host.contains(AppConstants.arcaeaHost) && isLoginPage && hasRedirect;
+    } catch (_) {
+      return rawUrl.contains(AppConstants.arcaeaHost) &&
+          (rawUrl.contains('/login') || rawUrl.contains('/zh/login')) &&
+          rawUrl.contains('redirect-path');
+    }
+  }
+
+  /// 检查页面 DOM 是否已就绪（卡片是否加载且内容已渲染）
   Future<bool> checkDOMReady(InAppWebViewController controller) async {
     try {
       final result = await controller.evaluateJavascript(source: '''
         (function() {
+          // 策略1：通过 card-list 容器查找卡片
           const lists = document.querySelectorAll('.card-list, [class*="card-list"]');
-          const hasCards = Array.from(lists).some(l => 
-            l.querySelectorAll('[data-v-b3942f14].card').length > 0
-          );
-          return hasCards;
+          
+          // 策略2：直接查找所有 .card 类元素（不依赖 data-v 属性）
+          const allCards = document.querySelectorAll('.card');
+          
+          // 策略3：查找包含分数的元素
+          const scoreElements = document.querySelectorAll('.ex-main, [class*="ex-main"], .score');
+          
+          // 检查是否有包含分数内容的卡片
+          function hasRenderedCards(cards) {
+            for (const card of cards) {
+              const text = card.innerText || '';
+              const hasScore = /\\d{1,3}(,\\d{3}){2}/.test(text) || /\\d{7,8}/.test(text);
+              const hasDiff = /FTR|BYD|PRS|PST|ETR|FUTURE|BEYOND|PRESENT|PAST|ETERNAL/i.test(text);
+              if (hasScore && hasDiff) return true;
+            }
+            return false;
+          }
+          
+          // 依次检查各种容器中的卡片
+          if (lists.length > 0) {
+            for (const list of lists) {
+              let cards = list.querySelectorAll('.card');
+              if (hasRenderedCards(cards)) return true;
+            }
+          }
+          
+          // 直接在全局范围查找
+          if (hasRenderedCards(allCards)) return true;
+          
+          // 检查分数元素是否存在且有内容
+          for (const el of scoreElements) {
+            const text = (el.textContent || '').trim();
+            if (/\\d{7,8}/.test(text) || /\\d{1,3}(,\\d{3}){2}/.test(text)) return true;
+          }
+          
+          return false;
         })();
       ''');
       return result == true;

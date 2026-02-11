@@ -57,6 +57,11 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   String? _dataUpdateMessage;
   DateTime? _lastDataUpdateTime;
 
+  // 防止重复显示数据准备提示
+  DateTime? _lastDataReadyNotificationTime;
+  String? _lastDataReadyUsername;
+  static const Duration _dataReadyNotificationCooldown = Duration(seconds: 3);
+
   // Getters for external access
   bool get isCheckingUpdate => _isCheckingUpdate;
   bool get isUpdatingData => _isUpdatingData;
@@ -301,7 +306,17 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     _imageManager.cachedData = data;
 
     if (mounted) {
-      _showSnackBar('数据已准备: ${data.player.username}');
+      // 防止短时间内重复显示相同的提示
+      final now = DateTime.now();
+      final shouldShow = _lastDataReadyNotificationTime == null ||
+          now.difference(_lastDataReadyNotificationTime!) > _dataReadyNotificationCooldown ||
+          _lastDataReadyUsername != data.player.username;
+      
+      if (shouldShow) {
+        _lastDataReadyNotificationTime = now;
+        _lastDataReadyUsername = data.player.username;
+        _showSnackBar('数据已准备: ${data.player.username}');
+      }
     }
   }
 
@@ -309,11 +324,19 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
     if (webViewController == null) return;
 
     try {
-      await _scriptManager.exportB30R10Data(webViewController!);
-    } catch (e, stackTrace) {
-      if (kDebugMode) {
-        debugPrint('[Arcaea Helper] 获取数据失败: $e\n堆栈: $stackTrace');
+      // 先检查 DOM 是否就绪，如果没有就等待（Vue.js 异步渲染）
+      var domReady = await _scriptManager.checkDOMReady(webViewController!);
+      if (!domReady) {
+        // 轮询等待卡片渲染，最多等待 10 秒
+        for (var i = 1; i <= 10; i++) {
+          await Future.delayed(const Duration(milliseconds: 1000));
+          domReady = await _scriptManager.checkDOMReady(webViewController!);
+          if (domReady) break;
+        }
       }
+      
+      await _scriptManager.exportB30R10Data(webViewController!);
+    } catch (e) {
       if (mounted) {
         _showSnackBar('获取数据失败: $e');
       }
@@ -370,7 +393,6 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
 
   void _onWebViewCreated(InAppWebViewController controller) {
     webViewController = controller;
-    // 不再需要 JS Handler：数据通过 Flutter 侧提取，无脚本注入
   }
 
   void _onLoadStart(InAppWebViewController controller, WebUri? url) {
@@ -412,6 +434,7 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
   ) async {
     final urlString = url?.toString() ?? '';
     final isTarget = _scriptManager.isTargetUrl(urlString);
+    final isLoginRedirect = _scriptManager.isLoginPageWithRedirect(urlString);
 
     if (isTarget) {
       _scriptManager.cancelTargetPageGraceTimer();
@@ -423,38 +446,79 @@ class ArcaeaWebViewPageState extends State<ArcaeaWebViewPage> {
       if (isReload == true) {
         await _tryExtractData(controller);
       }
+    } else if (isLoginRedirect) {
+      // 登录页面重定向：保持 isTargetPage 状态，等待重定向完成
+      _scriptManager.cancelTargetPageGraceTimer();
     } else if (!isTarget && _scriptManager.state.isTargetPage) {
-      _scriptManager.startTargetPageGraceTimer(() {});
+      // 只有在不是登录页面重定向的情况下，才启动宽限期定时器
+      _scriptManager.startTargetPageGraceTimer(() {
+        _scriptManager.state.isTargetPage = false;
+      });
     }
   }
 
   Future<void> _onLoadStop(InAppWebViewController controller, WebUri? url) async {
     final urlString = url?.toString() ?? '';
+    final isLoginRedirect = _scriptManager.isLoginPageWithRedirect(urlString);
 
     setState(() {
       progress = 1.0;
     });
 
     final isTarget = _scriptManager.isTargetUrl(urlString);
-    _scriptManager.state.isTargetPage = isTarget;
+    
+    // 如果是登录页面重定向，保持当前的 isTargetPage 状态，不立即清除
+    // 等待重定向完成后再判断
+    if (!isLoginRedirect) {
+      _scriptManager.state.isTargetPage = isTarget;
+    }
 
     if (isTarget) {
       await _tryExtractData(controller);
+    } else if (isLoginRedirect) {
+      // 登录页面重定向：等待一段时间后检查是否重定向到目标页面
+      Future.delayed(const Duration(milliseconds: 1000), () async {
+        try {
+          final currentUrl = await controller.getUrl();
+          final finalIsTarget = _scriptManager.isTargetUrl(currentUrl?.toString());
+          if (finalIsTarget) {
+            _scriptManager.state.isTargetPage = true;
+            await _tryExtractData(controller);
+          }
+        } catch (_) {}
+      });
     }
   }
 
   /// 等待 DOM 就绪后从页面提取 B30/R10 数据（Flutter 侧处理，无脚本注入）
+  /// Vue.js SPA 页面需要额外时间加载和渲染卡片数据，因此使用轮询机制
   Future<void> _tryExtractData(InAppWebViewController controller) async {
+    // 初始等待，给页面基本加载的时间
     await Future.delayed(AppConstants.initialDelay);
 
-    var domReady = await _scriptManager.checkDOMReady(controller);
-    if (!domReady) {
-      await Future.delayed(AppConstants.domCheckDelay);
-      domReady = await _scriptManager.checkDOMReady(controller);
-    }
-
-    if (domReady) {
-      await _scriptManager.extractB30R10Data(controller);
+    // Vue.js SPA 页面可能需要较长时间才能完成数据加载和卡片渲染
+    // 使用轮询机制，最多等待 15 秒
+    const maxAttempts = 15;
+    const pollInterval = Duration(milliseconds: 1000);
+    
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      final domReady = await _scriptManager.checkDOMReady(controller);
+      
+      if (domReady) {
+        await _scriptManager.extractB30R10Data(controller);
+        return;
+      }
+      
+      // 检查是否仍在目标页面
+      try {
+        final currentUrl = await controller.getUrl();
+        final stillOnTarget = _scriptManager.isTargetUrl(currentUrl?.toString());
+        if (!stillOnTarget) return;
+      } catch (_) {}
+      
+      if (attempt < maxAttempts) {
+        await Future.delayed(pollInterval);
+      }
     }
   }
 
